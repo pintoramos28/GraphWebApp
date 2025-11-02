@@ -57,6 +57,7 @@ test.describe('smoke guard rails', () => {
     await expect(previewTable).toBeVisible();
     await expect(previewTable).toContainText('Aurora');
 
+    await page.getByLabel('Toggle metadata for Hours').click();
     const typeSelector = page.getByLabel('Column type for Hours');
     await typeSelector.click();
     await page.getByRole('option', { name: 'String' }).click();

@@ -186,9 +186,7 @@ a {
 }
 
 .data-preview-table__column-type-select {
-  margin-top: 0.25rem;
-  font-size: 0.75rem;
-  min-width: 120px;
+  font-size: 0.78rem;
 }
 
 .data-preview-table__column-original {
