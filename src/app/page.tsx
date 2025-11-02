@@ -72,7 +72,7 @@ const HomePage = () => (
         wired to shelves in later phases.
       </p>
     </div>
-    <div className="chart-card__content">
+    <div className="chart-card__content" data-testid="sample-scatter">
       <VegaLiteChart
         spec={sampleScatterSpec}
         aria-label="Sample scatter plot showing defects versus engineering hours by team"

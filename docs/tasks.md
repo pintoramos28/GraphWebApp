@@ -13,7 +13,7 @@ Each task has a checkbox (`[ ]`) and **Refs** linking to the plan item(s) in `do
 2. [x] Add CI workflow (lint, type-check, unit tests) **and Playwright smoke E2E gating** via `pnpm check` (runs lint → tsc → unit → smoke). Smoke must **fail on `pageerror` and `console.error`**. **Refs:** P1, P82, **P85**; R43, R46, **R47**  
 3. [x] Create app shell (sidebar, canvas, inspector) and route structure; add root `<div data-testid="app-shell">`; wrap shell in **AppErrorBoundary** and mount **GlobalErrorHooks** (window `error`/`unhandledrejection`). **Refs:** P2, **P85**; R43, **R47**  
 4. [x] Integrate global state (Zustand) with action types and undo/redo stacks. **Refs:** P3, P34; R28, R43  
-5. [ ] Install UI kit (MUI or Radix) and base theme tokens (light/dark). **Refs:** P4; R23, R38, R43  
+5. [x] Install UI kit (MUI or Radix) and base theme tokens (light/dark). **Refs:** P4; R23, R38, R43  
 
 ---
 

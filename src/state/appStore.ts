@@ -162,65 +162,64 @@ const applyAction = (state: AppPresentState, action: AppAction): AppPresentState
   }
 };
 
-export const useAppStore = create<AppStoreState>((set, get) => ({
+export const useAppStore = create<AppStoreState>((set) => ({
   past: [],
   present: createInitialPresentState(),
   future: [],
   maxHistory: HISTORY_LIMIT,
   canUndo: false,
   canRedo: false,
-  dispatch: (action: AppAction) => {
-    const { present, past, maxHistory } = get();
-    const nextPresent = applyAction(present, action);
-    if (nextPresent === present) {
-      return;
-    }
-
-    const nextPast = [...past, cloneState(present)];
-    if (nextPast.length > maxHistory) {
-      nextPast.shift();
-    }
-
-    set({
-      past: nextPast,
-      present: cloneState(nextPresent),
-      future: [],
-      canUndo: nextPast.length > 0,
-      canRedo: false
-    });
-  },
-  undo: () => {
-    const { past, present, future } = get();
-    if (!past.length) {
-      return;
-    }
-    const previous = past[past.length - 1]!;
-    const nextPast = past.slice(0, past.length - 1);
-
-    set({
-      past: nextPast,
-      present: cloneState(previous),
-      future: [cloneState(present), ...future],
-      canUndo: nextPast.length > 0,
-      canRedo: true
-    });
-  },
-  redo: () => {
-    const { past, present, future } = get();
-    if (!future.length) {
-      return;
-    }
-    const [next, ...rest] = future as [AppPresentState, ...AppPresentState[]];
-    const nextPast = [...past, cloneState(present)];
-
-    set({
-      past: nextPast,
-      present: cloneState(next),
-      future: rest,
-      canUndo: true,
-      canRedo: rest.length > 0
-    });
-  },
+  dispatch: (action: AppAction) =>
+    set((state) => {
+      const nextPresent = applyAction(state.present, action);
+      if (nextPresent === state.present) {
+        return state;
+      }
+      const nextPast = [...state.past, cloneState(state.present)];
+      if (nextPast.length > state.maxHistory) {
+        nextPast.shift();
+      }
+      return {
+        past: nextPast,
+        present: cloneState(nextPresent),
+        future: [],
+        maxHistory: state.maxHistory,
+        canUndo: nextPast.length > 0,
+        canRedo: false
+      };
+    }),
+  undo: () =>
+    set((state) => {
+      if (!state.past.length) {
+        return state;
+      }
+      const previous = state.past[state.past.length - 1]!;
+      const nextPast = state.past.slice(0, state.past.length - 1);
+      return {
+        past: nextPast,
+        present: cloneState(previous),
+        future: [cloneState(state.present), ...state.future],
+        maxHistory: state.maxHistory,
+        canUndo: nextPast.length > 0,
+        canRedo: true
+      };
+    }),
+  redo: () =>
+    set((state) => {
+      if (!state.future.length) {
+        return state;
+      }
+      const [next, ...rest] = state.future as [AppPresentState, ...AppPresentState[]];
+      const nextPast = [...state.past, cloneState(state.present)];
+      return {
+        past: nextPast,
+        present: cloneState(next),
+        future: rest,
+        maxHistory: state.maxHistory,
+        canUndo: true,
+        canRedo: rest.length > 0
+      };
+    }),
   resetHistory: (state?: AppPresentState) => {
     const nextPresent = state ? cloneState(state) : createInitialPresentState();
     set({

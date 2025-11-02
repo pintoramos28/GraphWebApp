@@ -39,6 +39,12 @@ test.describe('smoke guard rails', () => {
     const shell = page.getByTestId('app-shell');
     await expect(shell).toBeVisible();
 
+    const chart = page
+      .getByTestId('sample-scatter')
+      .locator('canvas, svg')
+      .first();
+    await expect(chart).toBeVisible();
+
     expect(pageErrors, 'pageerror events should fail the smoke test').toHaveLength(0);
     expect(consoleErrors, 'console.error calls should fail the smoke test').toHaveLength(0);
     expect(unhandledRejections, 'unhandled rejections should fail the smoke test').toHaveLength(0);
