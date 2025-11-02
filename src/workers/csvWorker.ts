@@ -43,6 +43,26 @@ type ErrorResponse = {
   message: string;
 };
 
+type SupportedFormat = 'csv' | 'tsv' | 'parquet' | 'arrow' | 'xlsx';
+
+const EXTENSION_MAP: Record<SupportedFormat, string[]> = {
+  csv: ['.csv'],
+  tsv: ['.tsv', '.txt'],
+  parquet: ['.parquet'],
+  arrow: ['.arrow', '.feather', '.ipc'],
+  xlsx: ['.xlsx', '.xls']
+};
+
+const detectFormatFromName = (fileName: string): SupportedFormat | null => {
+  const lower = fileName.toLowerCase();
+  for (const [format, extensions] of Object.entries(EXTENSION_MAP) as [SupportedFormat, string[]][]) {
+    if (extensions.some((ext) => lower.endsWith(ext))) {
+      return format;
+    }
+  }
+  return null;
+};
+
 const ctx: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
 
 let duckDbPromise: Promise<AsyncDuckDB> | null = null;
@@ -87,6 +107,11 @@ const toRowObjects = (rows: unknown[]): Array<Record<string, unknown>> => {
 const DUCKDB_TIMEOUT_MS = 8000;
 
 const parseWithDuckDb = async (request: ParseRequest) => {
+  const format = detectFormatFromName(request.fileName ?? '');
+  if (!format || format === 'xlsx') {
+    throw new Error('DuckDB processing is not available for this file format.');
+  }
+
   postStatus({
     id: request.id,
     type: 'status',
@@ -115,9 +140,23 @@ const parseWithDuckDb = async (request: ParseRequest) => {
     });
 
     const viewName = `preview_${crypto.randomUUID().replace(/-/g, '_')}`;
-    await connection.query(
-      `CREATE OR REPLACE TEMPORARY VIEW ${viewName} AS SELECT * FROM read_csv_auto('${virtualPath}', SAMPLE_SIZE=20000, IGNORE_ERRORS=TRUE)`
-    );
+    let createViewSql: string;
+    switch (format) {
+      case 'csv':
+      case 'tsv':
+        createViewSql = `CREATE OR REPLACE TEMPORARY VIEW ${viewName} AS SELECT * FROM read_csv_auto('${virtualPath}', SAMPLE_SIZE=20000, IGNORE_ERRORS=TRUE)`;
+        break;
+      case 'parquet':
+        createViewSql = `CREATE OR REPLACE TEMPORARY VIEW ${viewName} AS SELECT * FROM read_parquet('${virtualPath}')`;
+        break;
+      case 'arrow':
+        createViewSql = `CREATE OR REPLACE TEMPORARY VIEW ${viewName} AS SELECT * FROM read_ipc('${virtualPath}')`;
+        break;
+      default:
+        throw new Error('Unsupported format for DuckDB processing.');
+    }
+
+    await connection.query(createViewSql);
 
     const previewResult = await connection.query(`SELECT * FROM ${viewName} LIMIT 1000`);
 

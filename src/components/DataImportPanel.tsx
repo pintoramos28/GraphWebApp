@@ -9,46 +9,11 @@ import {
   Typography
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { importCsvFile } from '@/lib/importCsv';
+import { importDatasetFile } from '@/lib/importCsv';
+import { generatePreview } from '@/lib/datasetPreview';
+import { detectFileFormat, isDelimitedFormat } from '@/lib/fileFormat';
 import { useImportStore } from '@/state/importStore';
 import { useAppStore } from '@/state/appStore';
-import Papa from 'papaparse';
-import { buildColumnsFromFields } from '@/lib/csvUtils';
-
-const parseQuickPreview = (file: File) =>
-  new Promise<{
-    columns: { name: string; type: string }[];
-    rows: Array<Record<string, unknown>>;
-    rowCount: number;
-    truncated: boolean;
-  }>((resolve, reject) => {
-    Papa.parse<Record<string, unknown>>(file, {
-      header: true,
-      dynamicTyping: true,
-      skipEmptyLines: true,
-      preview: 1000,
-      complete: (results) => {
-        if (results.errors?.length) {
-          reject(new Error(results.errors[0]?.message ?? 'Failed to parse file'));
-          return;
-        }
-        const rows = Array.isArray(results.data)
-          ? results.data.filter((row): row is Record<string, unknown> => Boolean(row))
-          : [];
-        const fields = results.meta.fields ?? Object.keys(rows[0] ?? {});
-        const columns = buildColumnsFromFields(fields, rows);
-        resolve({
-          columns,
-          rows,
-          rowCount: rows.length,
-          truncated: rows.length >= 1000
-        });
-      },
-      error: (error) => {
-        reject(error);
-      }
-    });
-  });
 
 const DataImportPanel = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -74,49 +39,67 @@ const DataImportPanel = () => {
         return;
       }
 
+      const format = detectFileFormat(file.name);
+      if (!format) {
+        setError('Unsupported file type. Please select CSV, TSV, Parquet, Arrow, or Excel files.');
+        resetInput();
+        return;
+      }
+
       startImport(file.name);
 
       try {
-        updateStatus('parsing', 'Generating quick preview…');
+        updateStatus('parsing', `Generating ${format.toUpperCase()} preview…`);
 
-        const quickPreview = await parseQuickPreview(file);
-        const datasetId = crypto.randomUUID();
+        let datasetId = crypto.randomUUID();
+        let quickPreview = null as Awaited<ReturnType<typeof generatePreview>> | null;
 
-        setPreview({
-          datasetId,
-          fileName: file.name,
-          columns: quickPreview.columns,
-          rows: quickPreview.rows,
-          rowCount: quickPreview.rowCount,
-          truncated: quickPreview.truncated
-        });
+        if (format !== 'parquet' && format !== 'arrow') {
+          quickPreview = await generatePreview(file, format);
 
-        registerDataset({
-          type: 'datasets/register',
-          dataset: {
-            id: datasetId,
-            name: file.name,
-            fieldCount: quickPreview.columns.length
-          }
-        });
+          setPreview({
+            datasetId,
+            fileName: file.name,
+            columns: quickPreview.columns,
+            rows: quickPreview.rows,
+            rowCount: quickPreview.rowCount,
+            truncated: quickPreview.truncated
+          });
+
+          registerDataset({
+            type: 'datasets/register',
+            dataset: {
+              id: datasetId,
+              name: file.name,
+              fieldCount: quickPreview.columns.length
+            }
+          });
+        } else {
+          updateStatus('loading', 'Parsing file with DuckDB-WASM…');
+        }
 
         const bypassDuckDb =
           typeof navigator !== 'undefined' &&
           (navigator.webdriver || /HeadlessChrome/i.test(navigator.userAgent ?? ''));
+        const skipPostProcessing = bypassDuckDb || format === 'xlsx';
 
-        if (!bypassDuckDb) {
-          const result = await importCsvFile(file, {
-            onStatus: (status) => {
-              updateStatus(
-                status.phase === 'loading'
-                  ? 'loading'
-                  : status.phase === 'parsing'
-                    ? 'parsing'
-                    : 'counting',
-                status.message
-              );
+        if (!skipPostProcessing) {
+          const result = await importDatasetFile(
+            file,
+            { bypassDuckDb: skipPostProcessing },
+            {
+              onStatus: (status) => {
+                updateStatus(
+                  status.phase === 'loading'
+                    ? 'loading'
+                    : status.phase === 'parsing'
+                      ? 'parsing'
+                      : 'counting',
+                  status.message
+                );
+              }
             }
-          });
+          );
 
           setPreview({
             datasetId,
@@ -127,7 +110,16 @@ const DataImportPanel = () => {
             truncated: result.truncated
           });
 
-          if (result.columns.length !== quickPreview.columns.length) {
+          if (quickPreview && result.columns.length !== quickPreview.columns.length) {
+            registerDataset({
+              type: 'datasets/register',
+              dataset: {
+                id: datasetId,
+                name: file.name,
+                fieldCount: result.columns.length
+              }
+            });
+          } else if (!quickPreview) {
             registerDataset({
               type: 'datasets/register',
               dataset: {
@@ -138,7 +130,7 @@ const DataImportPanel = () => {
             });
           }
         } else {
-          updateStatus('success', 'Showing quick preview (DuckDB disabled in automated runs).');
+          updateStatus('success', 'Showing preview (post-processing skipped in this environment).');
         }
       } catch (error) {
         console.error('CSV import failed', error);
@@ -157,7 +149,7 @@ const DataImportPanel = () => {
       <Stack spacing={1}>
         <Typography variant="h6">Data Import</Typography>
         <Typography variant="body2" color="text.secondary">
-          Upload CSV or TSV files to generate a 1,000-row preview using DuckDB-WASM.
+          Upload CSV, TSV, Parquet, Arrow, or Excel files to generate a 1,000-row preview (DuckDB-WASM enhances results where supported).
         </Typography>
       </Stack>
 
@@ -165,7 +157,7 @@ const DataImportPanel = () => {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv,.tsv,text/csv,text/tab-separated-values"
+          accept=".csv,.tsv,.txt,.parquet,.arrow,.feather,.ipc,.xlsx,.xls"
           tabIndex={-1}
           style={{ display: 'none' }}
           data-testid="dataset-file-input"

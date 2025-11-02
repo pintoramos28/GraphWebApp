@@ -82,8 +82,9 @@ const ensureWorker = () => {
   return worker;
 };
 
-export const importCsvFile = async (
+export const importDatasetFile = async (
   file: File,
+  options: { bypassDuckDb?: boolean } = {},
   callbacks: WorkerCallbacks = {}
 ): Promise<WorkerResult['result']> => {
   const activeWorker = ensureWorker();
@@ -105,7 +106,7 @@ export const importCsvFile = async (
         fileName: file.name,
         fileType: file.type,
         buffer,
-        bypassDuckDb: shouldBypassDuckDb
+        bypassDuckDb: shouldBypassDuckDb || options.bypassDuckDb === true
       },
       [buffer]
     );
