@@ -3,6 +3,7 @@ import { create } from 'zustand';
 export type PreviewColumn = {
   name: string;
   type: string;
+  originalType?: string;
 };
 
 export type DatasetPreview = {
@@ -25,6 +26,7 @@ type ImportStoreState = {
   updateStatus: (phase: ImportStatusPhase, message?: string) => void;
   setPreview: (preview: DatasetPreview) => void;
   setError: (message: string) => void;
+  overrideColumnType: (columnName: string, newType: string) => void;
   reset: () => void;
 };
 
@@ -47,13 +49,34 @@ export const useImportStore = create<ImportStoreState>((set) => ({
       currentFile: state.currentFile
     })),
   setPreview: (preview) =>
-    set({
-      phase: 'success',
-      message: `Showing ${Math.min(
-        1000,
-        preview.rows.length
-      ).toLocaleString()} rows${preview.truncated ? ' (preview limited to first 1,000 rows)' : ''}`,
-      preview
+    set((state) => {
+      const previousColumns = new Map(
+        state.preview?.columns.map((column) => [column.name, column]) ?? []
+      );
+
+      const columns = preview.columns.map((column) => {
+        const previous = previousColumns.get(column.name);
+        const autoType = column.type;
+        const originalType = previous?.originalType ?? autoType;
+        const hasOverride = previous && previous.type !== previous.originalType;
+        return {
+          ...column,
+          originalType: autoType,
+          type: hasOverride ? previous.type : autoType
+        };
+      });
+
+      return {
+        phase: 'success',
+        message: `Showing ${Math.min(
+          1000,
+          preview.rows.length
+        ).toLocaleString()} rows${preview.truncated ? ' (preview limited to first 1,000 rows)' : ''}`,
+        preview: {
+          ...preview,
+          columns
+        }
+      };
     }),
   setError: (message) =>
     set((state) => ({
@@ -61,6 +84,26 @@ export const useImportStore = create<ImportStoreState>((set) => ({
       message,
       preview: state.preview
     })),
+  overrideColumnType: (columnName, newType) =>
+    set((state) => {
+      if (!state.preview) {
+        return state;
+      }
+      return {
+        ...state,
+        preview: {
+          ...state.preview,
+          columns: state.preview.columns.map((column) =>
+            column.name === columnName
+              ? {
+                  ...column,
+                  type: newType
+                }
+              : column
+          )
+        }
+      };
+    }),
   reset: () =>
     set({
       phase: 'idle',

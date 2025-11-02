@@ -57,6 +57,11 @@ test.describe('smoke guard rails', () => {
     await expect(previewTable).toBeVisible();
     await expect(previewTable).toContainText('Aurora');
 
+    const typeSelector = page.getByLabel('Column type for Hours');
+    await typeSelector.click();
+    await page.getByRole('option', { name: 'String' }).click();
+    await expect(typeSelector).toContainText('String');
+
     expect(pageErrors, 'pageerror events should fail the smoke test').toHaveLength(0);
     expect(consoleErrors, 'console.error calls should fail the smoke test').toHaveLength(0);
     expect(unhandledRejections, 'unhandled rejections should fail the smoke test').toHaveLength(0);

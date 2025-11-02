@@ -1,10 +1,20 @@
 'use client';
 
-import { memo } from 'react';
-import { Paper, Stack, Typography } from '@mui/material';
+import { memo, useCallback } from 'react';
+import { MenuItem, Paper, Select, Stack, Typography } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import { useImportStore } from '@/state/importStore';
 
 const DataPreviewTable = () => {
+  const overrideColumnType = useImportStore((state) => state.overrideColumnType);
+
+  const handleTypeChange = useCallback(
+    (columnName: string, event: SelectChangeEvent<string>) => {
+      overrideColumnType(columnName, event.target.value);
+    },
+    [overrideColumnType]
+  );
+
   const preview = useImportStore((state) => state.preview);
 
   if (!preview) {
@@ -32,8 +42,34 @@ const DataPreviewTable = () => {
             <tr>
               {columns.map((column) => (
                 <th key={column.name}>
-                  <span>{column.name}</span>
-                  <span className="data-preview-table__column-type">{column.type}</span>
+                  <Stack spacing={0.5} alignItems="flex-start">
+                    <Typography variant="subtitle2" component="span">
+                      {column.name}
+                    </Typography>
+                    <Select
+                      size="small"
+                      value={column.type}
+                      onChange={(event) => handleTypeChange(column.name, event)}
+                      className="data-preview-table__column-type-select"
+                      displayEmpty
+                      inputProps={{ 'aria-label': `Column type for ${column.name}` }}
+                    >
+                      <MenuItem value="string">String</MenuItem>
+                      <MenuItem value="number">Number</MenuItem>
+                      <MenuItem value="boolean">Boolean</MenuItem>
+                      <MenuItem value="datetime">Datetime</MenuItem>
+                      <MenuItem value="object">Object</MenuItem>
+                    </Select>
+                    {column.originalType && column.originalType !== column.type ? (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        className="data-preview-table__column-original"
+                      >
+                        Auto type: {column.originalType}
+                      </Typography>
+                    ) : null}
+                  </Stack>
                 </th>
               ))}
             </tr>

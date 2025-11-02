@@ -11,7 +11,7 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { importDatasetFile } from '@/lib/importCsv';
 import { generatePreview } from '@/lib/datasetPreview';
-import { detectFileFormat, isDelimitedFormat } from '@/lib/fileFormat';
+import { detectFileFormat } from '@/lib/fileFormat';
 import { useImportStore } from '@/state/importStore';
 import { useAppStore } from '@/state/appStore';
 

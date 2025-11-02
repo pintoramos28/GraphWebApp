@@ -184,3 +184,14 @@ a {
   letter-spacing: 0.05em;
   color: var(--text-secondary);
 }
+
+.data-preview-table__column-type-select {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  min-width: 120px;
+}
+
+.data-preview-table__column-original {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
