@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import type { ParseError } from 'papaparse';
 import * as XLSX from 'xlsx';
 import { buildColumnsFromFields } from './csvUtils';
 import type { SupportedFormat } from './fileFormat';
@@ -12,8 +13,34 @@ export type PreviewResult = {
 
 const MAX_PREVIEW_ROWS = 1000;
 
-export const parseDelimitedPreview = async (file: File): Promise<PreviewResult> =>
-  new Promise<PreviewResult>((resolve, reject) => {
+const isLikelyHtml = (headSample: string): boolean => {
+  const sample = headSample.trimStart().toLowerCase();
+  return sample.startsWith('<!doctype html') || sample.startsWith('<html');
+};
+
+const describePapaError = (error: Pick<ParseError, 'code' | 'message'> & { code: string }): string => {
+  const code = error.code as string;
+  switch (code) {
+    case 'DuplicateHeader':
+      return 'Duplicate column headers detected. Please ensure each column name is unique.';
+    case 'TooFewFields':
+    case 'TooManyFields':
+      return 'Row length mismatch detected. Verify that your delimiters and quoted fields are valid.';
+    case 'InvalidQuotes':
+    case 'UndefinedVariable':
+      return 'Malformed quoted field detected. Check for unmatched quotes in your data.';
+    default:
+      return error.message;
+  }
+};
+
+export const parseDelimitedPreview = async (file: File): Promise<PreviewResult> => {
+  const headSample = await file.slice(0, 2048).text();
+  if (isLikelyHtml(headSample)) {
+    throw new Error('The selected file or URL appears to contain HTML instead of CSV data. Please provide a direct download link to the dataset.');
+  }
+
+  return new Promise<PreviewResult>((resolve, reject) => {
     Papa.parse<Record<string, unknown>>(file, {
       header: true,
       dynamicTyping: true,
@@ -21,7 +48,8 @@ export const parseDelimitedPreview = async (file: File): Promise<PreviewResult> 
       preview: MAX_PREVIEW_ROWS,
       complete: (results) => {
         if (results.errors?.length) {
-          reject(new Error(results.errors[0]?.message ?? 'Failed to parse file'));
+          const firstError = results.errors[0];
+          reject(new Error(firstError ? describePapaError(firstError) : 'Failed to parse file.'));
           return;
         }
         const rows = Array.isArray(results.data)
@@ -38,6 +66,7 @@ export const parseDelimitedPreview = async (file: File): Promise<PreviewResult> 
       error: (error) => reject(error)
     });
   });
+};
 
 export const parseExcelPreview = async (file: File): Promise<PreviewResult> => {
   const buffer = await file.arrayBuffer();
