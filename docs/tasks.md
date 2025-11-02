@@ -9,17 +9,17 @@ Each task has a checkbox (`[ ]`) and **Refs** linking to the plan item(s) in `do
 
 ## Phase 0 — Project Setup
 
-1. [ ] Initialize repo with Next.js + TypeScript + pnpm; add ESLint/Prettier configs; configure **TypeScript strict** (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `useUnknownInCatchVariables`). **Refs:** P1, **P86**; R43, R46, **R48**  
-2. [ ] Add CI workflow (lint, type-check, unit tests) **and Playwright smoke E2E gating** via `pnpm check` (runs lint → tsc → unit → smoke). Smoke must **fail on `pageerror` and `console.error`**. **Refs:** P1, P82, **P85**; R43, R46, **R47**  
-3. [ ] Create app shell (sidebar, canvas, inspector) and route structure; add root `<div data-testid="app-shell">`; wrap shell in **AppErrorBoundary** and mount **GlobalErrorHooks** (window `error`/`unhandledrejection`). **Refs:** P2, **P85**; R43, **R47**  
-4. [ ] Integrate global state (Zustand) with action types and undo/redo stacks. **Refs:** P3, P34; R28, R43  
+1. [x] Initialize repo with Next.js + TypeScript + pnpm; add ESLint/Prettier configs; configure **TypeScript strict** (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `useUnknownInCatchVariables`). **Refs:** P1, **P86**; R43, R46, **R48**  
+2. [x] Add CI workflow (lint, type-check, unit tests) **and Playwright smoke E2E gating** via `pnpm check` (runs lint → tsc → unit → smoke). Smoke must **fail on `pageerror` and `console.error`**. **Refs:** P1, P82, **P85**; R43, R46, **R47**  
+3. [x] Create app shell (sidebar, canvas, inspector) and route structure; add root `<div data-testid="app-shell">`; wrap shell in **AppErrorBoundary** and mount **GlobalErrorHooks** (window `error`/`unhandledrejection`). **Refs:** P2, **P85**; R43, **R47**  
+4. [x] Integrate global state (Zustand) with action types and undo/redo stacks. **Refs:** P3, P34; R28, R43  
 5. [ ] Install UI kit (MUI or Radix) and base theme tokens (light/dark). **Refs:** P4; R23, R38, R43  
 
 ---
 
 ## Phase 1 — Data I/O & Schema
 
-6. [ ] Implement worker pool and message protocol (progress, error); use a **`createWorker` wrapper** that forwards `error` and `messageerror` to `console.error`. **Refs:** P6, P50, **P87**; R34, **R49**  
+6. [x] Implement worker pool and message protocol (progress, error); use a **`createWorker` wrapper** that forwards `error` and `messageerror` to `console.error`. **Refs:** P6, P50, **P87**; R34, **R49**  
 7. [ ] CSV/TSV import via DuckDB-WASM (fallback PapaParse) with 1,000-row preview. **Refs:** P10; R1, R34  
 8. [ ] Excel/Parquet/Arrow import via DuckDB-WASM and Arrow adapters. **Refs:** P10; R1, R34  
 9. [ ] Schema/type inference and editable type controls in grid. **Refs:** P10, P12; R2  
@@ -37,7 +37,7 @@ Each task has a checkbox (`[ ]`) and **Refs** linking to the plan item(s) in `do
 
 ## Phase 2 — Visualization Core (Scatter/Line/Bar)
 
-19. [ ] Integrate `vega-embed` wrapper component with spec versioning. **Refs:** P20; R45, R43  
+19. [x] Integrate `vega-embed` wrapper component with spec versioning. **Refs:** P20; R45, R43  
 20. [ ] Build drag-and-drop shelves for X, Y, Color, Size, Shape, Opacity, Row, Column. **Refs:** P21; R17  
 21. [ ] Implement type guards and drop validation with user feedback. **Refs:** P21; R17, R18  
 22. [ ] Scatter (base): render marks, handle nulls, axes. **Refs:** P22; R10  
@@ -115,13 +115,13 @@ Each task has a checkbox (`[ ]`) and **Refs** linking to the plan item(s) in `do
 
 ## Phase 8 — Testing & QA
 
-67. [ ] Unit tests for stores, reducers, and utilities; **Vitest setup throws on `console.error`/`console.warn` and fails on unhandled rejections**. **Refs:** P80, **P86**; R46, **R48**  
+67. [x] Unit tests for stores, reducers, and utilities; **Vitest setup throws on `console.error`/`console.warn` and fails on unhandled rejections**. **Refs:** P80, **P86**; R46, **R48**  
 68. [ ] Component tests for shelves, inspector, grid. **Refs:** P80; R46  
 69. [ ] E2E: import → scatter → facet → export happy path. **Refs:** P81; R46, R1, R10, R12, R30  
 70. [ ] E2E: filters, brush/lasso, drilldown, undo/redo. **Refs:** P81; R5, R25, R27, R28  
 71. [ ] E2E: large dataset thresholds and degrade path. **Refs:** P81, P51; R33  
 72. [ ] Visual regression snapshots for key chart states. **Refs:** P83; R46  
-73. [ ] CI: `pnpm check` gates PRs (lint, type, unit, **smoke**). **Refs:** P82, **P85**; R43, R46, **R47**  
+73. [x] CI: `pnpm check` gates PRs (lint, type, unit, **smoke**). **Refs:** P82, **P85**; R43, R46, **R47**  
 
 ---
 
@@ -138,4 +138,3 @@ Each task has a checkbox (`[ ]`) and **Refs** linking to the plan item(s) in `do
 
 78. [ ] Backend for version history and share links with Auth/RBAC. **Refs:** P43, P71; R32, R42  
 79. [ ] Enhanced diagnostics dashboard for support. **Refs:** P54; R36  
-

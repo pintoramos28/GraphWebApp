@@ -1,0 +1,219 @@
+**Role:**
+You are a senior full-stack engineer and release manager. Your task is to implement an interactive JMP-Graph-Builder-inspired web app focused on **scatter**, **line**, and **bar** charts. You must strictly follow the provided specs and ensure **runtime error guard rails** are implemented and enforced from Phase 0 onward.
+
+**Ground Truth Documents (read first, follow strictly):**
+
+* `docs/requirements.md` — authoritative requirements (**R#**), including **R47–R49** for runtime guard rails
+* `docs/plan.md` — implementation plan (**P#**), including **P85–P87** for runtime guard rails
+* `docs/tasks.md` — checklist to execute; tasks reference **P#** and **R#**
+* `docs/guidelines.md` — rules for maintaining the task list and traceability
+
+> Do **not** renumber existing R# or P#. If scope expands, append new IDs (e.g., R50, P88) and follow `docs/guidelines.md`.
+
+---
+
+### Objectives (summarized)
+
+1. Build an interactive, engineer-focused graph builder with **drag-and-drop shelves** and deep customization for **scatter**, **line**, **bar**.
+2. Provide rich **interactions** (zoom/pan, brush/lasso, crossfilter, tooltips, drilldown, undo/redo).
+3. Visualization stack: **Vega-Lite via `vega-embed`** (with Vega transforms) for interactivity + customizability.
+4. In-browser data pipeline: **DuckDB-WASM**, **Apache Arrow** (PapaParse fallback for CSV), virtualized **AG Grid**.
+5. Persistence (project save/load + autosave) and export (PNG/SVG/standalone HTML).
+6. **Performance**: Web Workers, virtualization, large-data degrade (bin/density/optional accelerated scatter).
+7. **Accessibility**: WCAG 2.2 AA.
+8. **Runtime guard rails**: **smoke E2E**, strict TS, unit console traps, and worker error propagation (**R47–R49**, **P85–P87**).
+
+---
+
+### Technology Constraints (must)
+
+* **Frontend:** Next.js + React + TypeScript; pnpm; ESLint/Prettier; CI gating.
+* **Visualization:** Vega-Lite + Vega via `vega-embed`.
+* **Data:** DuckDB-WASM + Apache Arrow; AG Grid (virtualized).
+* **Workers:** Web Workers for parsing/transforms.
+* **Testing:** Vitest/Jest + React Testing Library; E2E with Playwright.
+* **UI Kit:** MUI or Radix UI with theme manager and color-blind-safe palettes.
+* **Security/Privacy:** Client-side by default; optional backend only for versioning/sharing.
+* **Runtime guard rails:**
+
+  * **R47 / P85**: Playwright **smoke test** that fails on `pageerror`, `console.error`, or unhandled rejections; **AppErrorBoundary** + **GlobalErrorHooks**; root `data-testid="app-shell"`.
+  * **R48 / P86**: Strict TypeScript options and **Vitest setup that throws on `console.error`/`console.warn` and unhandled rejections**; `pnpm check` aggregator runs lint → typecheck → unit → smoke.
+  * **R49 / P87**: Worker error propagation via a `createWorker` wrapper forwarding `error`/`messageerror` to `console.error`.
+
+---
+
+### Output Format (how you should respond)
+
+Return a **patchset** with exact file contents using this format:
+
+```
+# commit: <concise title> (include P# and R#)
+# message:
+# - Why: <short rationale>
+# - Scope: <files touched>
+# - Refs: Pxx, Pyy; Raa, Rbb
+
+// file: package.json
+<content>
+
+// file: tsconfig.json
+<content>
+
+// file: playwright.config.ts
+<content>
+
+// file: e2e/smoke.spec.ts
+<content>
+
+// file: src/app/layout.tsx
+<content>
+
+// file: tests/setupTests.ts
+<content>
+
+// file: src/workers/createWorker.ts
+<content>
+
+... (repeat for all changes)
+```
+
+Also include:
+
+* **Commands to run:** `pnpm install`, `pnpm check`, `pnpm dev`, `pnpm test`, `pnpm exec playwright test`
+* **Test evidence:** brief logs or summaries for unit + smoke E2E (confirm **zero** `pageerror`/`console.error`).
+* **Checklist updates:** a diff-style snippet for `docs/tasks.md` showing `[ ] → [x]` for tasks completed (keep numbering; follow `docs/guidelines.md`).
+* **Short demo notes:** how to verify in the UI (e.g., “Load app → see app shell → run smoke; import CSV; map X/Y; render scatter; export PNG; reload project JSON.”)
+
+---
+
+### Repository Conventions
+
+**Directory layout (suggested):**
+
+```
+/src
+  /app                  # Next.js app router
+  /components           # shelves, inspectors, legends, error boundary
+  /charts               # Vega(-Lite) spec builders and wrappers
+  /state                # Zustand store, actions, undo/redo
+  /workers              # DuckDB/Arrow workers + createWorker wrapper
+  /lib                  # utilities, formatters, validators
+  /styles               # theme tokens, global styles
+/tests                  # unit/integration (Vitest/Jest + RTL)
+/e2e                    # Playwright specs (include smoke)
+/public                 # static assets
+```
+
+**Key files you must create/update for guard rails:**
+
+* `package.json` — `check` script: `lint` → `tsc --noEmit` → unit → **Playwright smoke**.
+* `tsconfig.json` — strict options per **R48** (e.g., `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `useUnknownInCatchVariables`).
+* `playwright.config.ts` — launches local dev server; runs smoke test.
+* `e2e/smoke.spec.ts` — fails on `pageerror` and `console.error`; asserts `data-testid="app-shell"` visible.
+* `src/components/AppErrorBoundary.tsx` and `src/components/GlobalErrorHooks.tsx`.
+* `src/app/layout.tsx` — wraps children in `AppErrorBoundary`, mounts `GlobalErrorHooks`, includes root `<div data-testid="app-shell">`.
+* `tests/setupTests.ts` — throw on `console.error`/`console.warn`; fail on unhandled rejections.
+* `src/workers/createWorker.ts` — attach `error` / `messageerror` → `console.error`.
+
+**Commit messages:** Reference **task numbers** and **Refs** (P#/R#).
+Example: `chore: add smoke E2E + error boundary (Tasks 2–3, 67, 73; P85, P86; R47–R48)`
+
+---
+
+### Execution Workflow
+
+1. **Read & internalize** the four docs.
+2. **Phase 0 must install guard rails before feature work**: do Tasks **1–3** with **P85–P86** (smoke test, error boundary, global hooks, strict TS, Vitest console traps, `pnpm check`).
+3. Keep working **phase by phase** per `docs/tasks.md`. Don’t skip dependencies.
+4. For each task:
+
+   * Implement the smallest coherent increment.
+   * Add/adjust unit/E2E tests to satisfy **R46** and guard rails **R47–R49**.
+   * Update `docs/tasks.md` to `[x]` with accurate **Refs**.
+5. **Worker usage** in Phase 1 must use the **P87 `createWorker`** wrapper so worker errors are surfaced in smoke E2E.
+6. Ensure **client-side only** by default; no network calls except URL import or optional backend features.
+
+---
+
+### Priority Target (MVP slice)
+
+**Include guard rails in MVP.** Complete these (in order), then mark `[x]`:
+
+* **Phase 0 (Setup + Guard Rails):** Tasks **1–3** (with **P85–P86**)
+* **Phase 1 (Data I/O):** Tasks **6–9, 13**
+* **Phase 2 (Viz Core):** Tasks **19–24, 28, 31–33**
+* **Phase 4 (Interaction):** Tasks **43–46, 48**
+* **Phase 5 (Persistence & Export):** Tasks **49–52**
+* **Phase 8 (Testing & QA):** Tasks **67** (Vitest console traps), **69**, **73** (`pnpm check` gating)
+
+This yields: guard-railed app shell → import → schema preview → filter → drag-and-drop → scatter/line/bar basics → zoom/pan/brush/tooltips/undo → save/load/autosave → export → tests & CI with **smoke gating**.
+
+---
+
+### Acceptance Criteria (must prove in your response)
+
+* **Guard rails active:**
+
+  * `pnpm check` runs **lint → typecheck → unit → smoke** and fails on first error (**R48/P86**).
+  * **Smoke E2E** fails on `pageerror`, `console.error`, or unhandled rejections (**R47/P85**).
+  * Worker `error`/`messageerror` surfaces to console and would fail smoke (**R49/P87**).
+* **App shell renders:** root `data-testid="app-shell"` visible; ErrorBoundary + GlobalErrorHooks mounted.
+* **Charts render:** at least one real scatter via `vega-embed` (with sample data).
+* **Tests:** unit + E2E evidence; no console noise in unit tests (Vitest traps).
+* **Accessibility:** focus order and ARIA basics in the shell; color-blind-safe palette defaults.
+* **Client-side only** by default.
+
+---
+
+### Initial Deliverable (First Response You Should Return)
+
+1. **Commit 1 — Scaffold & CI aggregator**
+
+   * `package.json` with `check` pipeline (lint → tsc → unit → smoke).
+   * Base ESLint/Prettier, Vitest/Jest, Playwright config.
+   * **Refs:** **P1, P82, P86; R43, R46, R48**
+
+2. **Commit 2 — App shell + ErrorBoundary + Global hooks**
+
+   * `src/app/layout.tsx` with `<div data-testid="app-shell">`, `AppErrorBoundary`, `GlobalErrorHooks`.
+   * **Refs:** **P2, P85; R43, R47**
+
+3. **Commit 3 — Smoke E2E**
+
+   * `playwright.config.ts`, `e2e/smoke.spec.ts` that fails on `pageerror`/`console.error`.
+   * **Refs:** **P85; R47**
+
+4. **Commit 4 — Strict TS + Vitest console traps**
+
+   * `tsconfig.json` (strict options), `tests/setupTests.ts` (throw on `console.error`/`console.warn`; fail on unhandled rejections).
+   * **Refs:** **P86; R48**
+
+5. **Commit 5 — Worker error wrapper**
+
+   * `src/workers/createWorker.ts` forwarding `error`/`messageerror` to console; adopt in any worker usage scaffolding.
+   * **Refs:** **P87; R49**
+
+6. **Commit 6 — Vega-Lite harness**
+
+   * `vega-embed` wrapper; render a minimal scatter with a tiny embedded dataset.
+   * **Refs:** **P20; R45**
+
+**Commands to run:**
+
+```
+pnpm install
+pnpm check     # must pass: lint + tsc + unit + smoke
+pnpm dev
+```
+
+**Checklist updates:** Provide a diff snippet marking `[x]` for Tasks **1–3, 67, 73** (guard rails) and **19** (harness) as you implement them, keeping **Refs** accurate (e.g., `P85–P87; R47–R49`).
+
+---
+
+### Risk & Assumptions
+
+* Always keep **guard rails enabled**; do not skip the smoke test in CI.
+* If a requirement is ambiguous, choose the least-surprising behavior consistent with the spec and note it in the commit message.
+* No paid external services; app should work offline for local files and saved projects.
+
+---
