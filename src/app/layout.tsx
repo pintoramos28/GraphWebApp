@@ -8,6 +8,7 @@ import ProjectTitleControl from '@/components/ProjectTitleControl';
 import HistoryControls from '@/components/HistoryControls';
 import ThemeToggle from '@/components/ThemeToggle';
 import AppThemeProvider from '@/components/AppThemeProvider';
+import DataImportPanel from '@/components/DataImportPanel';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -56,9 +57,9 @@ const RootLayout = ({ children }: RootLayoutProps) => (
                 </Stack>
               </Stack>
             </header>
-            <aside aria-label="Field list" className="app-shell__sidebar">
-              <p>Drag fields here (coming soon).</p>
-            </aside>
+          <aside aria-label="Field list" className="app-shell__sidebar">
+              <DataImportPanel />
+          </aside>
             <main className="app-shell__main">{children}</main>
             <aside aria-label="Inspector" className="app-shell__inspector">
               <p>Inspector controls will appear here.</p>

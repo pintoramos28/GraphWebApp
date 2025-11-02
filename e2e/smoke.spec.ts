@@ -45,6 +45,18 @@ test.describe('smoke guard rails', () => {
       .first();
     await expect(chart).toBeVisible();
 
+    const fileInput = page.locator('[data-testid="dataset-file-input"]');
+    await fileInput.setInputFiles('tests/fixtures/sample.csv');
+
+    const successAlert = page
+      .getByRole('alert')
+      .filter({ hasText: 'Imported sample.csv' });
+    await expect(successAlert).toBeVisible({ timeout: 20000 });
+
+    const previewTable = page.getByTestId('data-preview-table');
+    await expect(previewTable).toBeVisible();
+    await expect(previewTable).toContainText('Aurora');
+
     expect(pageErrors, 'pageerror events should fail the smoke test').toHaveLength(0);
     expect(consoleErrors, 'console.error calls should fail the smoke test').toHaveLength(0);
     expect(unhandledRejections, 'unhandled rejections should fail the smoke test').toHaveLength(0);

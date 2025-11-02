@@ -1,5 +1,6 @@
 import type { TopLevelSpec } from 'vega-lite';
 import VegaLiteChart from '@/components/VegaLiteChart';
+import DataPreviewTable from '@/components/DataPreviewTable';
 
 const sampleScatterSpec: TopLevelSpec = {
   $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
@@ -78,6 +79,7 @@ const HomePage = () => (
         aria-label="Sample scatter plot showing defects versus engineering hours by team"
       />
     </div>
+    <DataPreviewTable />
   </section>
 );
 
