@@ -15,7 +15,7 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LinkIcon from '@mui/icons-material/Link';
 import { importDatasetFile } from '@/lib/importCsv';
-import { generatePreview } from '@/lib/datasetPreview';
+import { generatePreview, parseDelimitedText } from '@/lib/datasetPreview';
 import { detectFileFormat } from '@/lib/fileFormat';
 import { useImportStore } from '@/state/importStore';
 import { useAppStore } from '@/state/appStore';
@@ -34,6 +34,8 @@ const DataImportPanel = () => {
   const registerDataset = useAppStore((state) => state.dispatch);
   const [urlInput, setUrlInput] = useState('');
   const [urlWarning, setUrlWarning] = useState<string | null>(null);
+  const [pasteInput, setPasteInput] = useState('');
+  const [pasteWarning, setPasteWarning] = useState<string | null>(null);
 
   const resetInput = () => {
     if (fileInputRef.current) {
@@ -189,6 +191,47 @@ const DataImportPanel = () => {
     [addRecentUrl, processFile, setError]
   );
 
+  const handlePasteImport = useCallback(async () => {
+    const trimmed = pasteInput.trim();
+    if (!trimmed) {
+      setPasteWarning('Paste tabular data where the first row contains headers.');
+      return;
+    }
+
+    startImport('pasted-data');
+
+    try {
+      updateStatus('parsing', 'Parsing pasted data…');
+      const previewResult = await parseDelimitedText(trimmed, 'pasted.csv');
+
+      const datasetId = crypto.randomUUID();
+      setPreview({
+        datasetId,
+        fileName: 'pasted-data',
+        columns: previewResult.columns,
+        rows: previewResult.rows,
+        rowCount: previewResult.rowCount,
+        truncated: previewResult.truncated
+      });
+
+      registerDataset({
+        type: 'datasets/register',
+        dataset: {
+          id: datasetId,
+          name: 'Pasted Data',
+          fieldCount: previewResult.columns.length
+        }
+      });
+      setPasteWarning(null);
+      setPasteInput('');
+      updateStatus('success', 'Pasted data preview ready.');
+    } catch (error) {
+      console.error('Pasted data import failed', error);
+      setPasteWarning(error instanceof Error ? error.message : 'Failed to parse pasted data.');
+      setError(error instanceof Error ? error.message : 'Failed to parse pasted data.');
+    }
+  }, [pasteInput, registerDataset, setError, setPreview, startImport, updateStatus]);
+
   const showProgress = phase === 'loading' || phase === 'parsing' || phase === 'counting';
 
   return (
@@ -268,6 +311,31 @@ const DataImportPanel = () => {
             ))}
           </TextField>
         ) : null}
+      </Stack>
+
+      <Stack spacing={1} direction="column">
+        <TextField
+          label="Paste tabular data"
+          placeholder="team,hours\nAurora,10"
+          value={pasteInput}
+          onChange={(event) => {
+            setPasteInput(event.target.value);
+            setPasteWarning(null);
+          }}
+          multiline
+          minRows={4}
+          maxRows={8}
+          error={Boolean(pasteWarning)}
+          helperText={pasteWarning ?? 'First row should include column headers separated by commas or tabs.'}
+        />
+        <Button
+          variant="outlined"
+          onClick={handlePasteImport}
+          disabled={!pasteInput.trim()}
+          data-testid="dataset-paste-import"
+        >
+          Import Pasted Data
+        </Button>
       </Stack>
 
       {showProgress && <LinearProgress variant="indeterminate" aria-label="Importing dataset" />}

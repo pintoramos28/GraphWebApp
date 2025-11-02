@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import type { ParseError } from 'papaparse';
+import type { LocalFile, ParseError } from 'papaparse';
 import * as XLSX from 'xlsx';
 import { buildColumnsFromFields } from './csvUtils';
 import type { SupportedFormat } from './fileFormat';
@@ -18,21 +18,48 @@ const isLikelyHtml = (headSample: string): boolean => {
   return sample.startsWith('<!doctype html') || sample.startsWith('<html');
 };
 
-const describePapaError = (error: Pick<ParseError, 'code' | 'message'> & { code: string }): string => {
-  const code = error.code as string;
-  switch (code) {
-    case 'DuplicateHeader':
-      return 'Duplicate column headers detected. Please ensure each column name is unique.';
-    case 'TooFewFields':
-    case 'TooManyFields':
-      return 'Row length mismatch detected. Verify that your delimiters and quoted fields are valid.';
-    case 'InvalidQuotes':
-    case 'UndefinedVariable':
-      return 'Malformed quoted field detected. Check for unmatched quotes in your data.';
-    default:
-      return error.message;
+const isParseError = (value: unknown): value is ParseError =>
+  typeof value === 'object' &&
+  value !== null &&
+  'code' in value &&
+  typeof (value as ParseError).code === 'string' &&
+  'message' in value &&
+  typeof (value as ParseError).message === 'string';
+
+const describePapaError = (error: unknown, fallback: string): string => {
+  if (!error) {
+    return fallback;
   }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (isParseError(error)) {
+    const code = error.code as string;
+    switch (code) {
+      case 'DuplicateHeader':
+        return 'Duplicate column headers detected. Please ensure each column name is unique.';
+      case 'TooFewFields':
+      case 'TooManyFields':
+      case 'FieldMismatch':
+        return 'Row length mismatch detected. Verify that your delimiters and quoted fields are valid.';
+      case 'InvalidQuotes':
+      case 'TrailingQuote':
+        return 'Malformed quoted field detected. Check for unmatched quotes in your data.';
+      default:
+        return error.message;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+
+  return fallback;
 };
+
+const wrapPapaError = (error: unknown, fallback: string): Error => new Error(describePapaError(error, fallback));
 
 export const parseDelimitedPreview = async (file: File): Promise<PreviewResult> => {
   const headSample = await file.slice(0, 2048).text();
@@ -49,7 +76,7 @@ export const parseDelimitedPreview = async (file: File): Promise<PreviewResult> 
       complete: (results) => {
         if (results.errors?.length) {
           const firstError = results.errors[0];
-          reject(new Error(firstError ? describePapaError(firstError) : 'Failed to parse file.'));
+          reject(wrapPapaError(firstError, 'Failed to parse file.'));
           return;
         }
         const rows = Array.isArray(results.data)
@@ -63,7 +90,44 @@ export const parseDelimitedPreview = async (file: File): Promise<PreviewResult> 
           truncated: rows.length >= MAX_PREVIEW_ROWS
         });
       },
-      error: (error) => reject(error)
+      error: (error: Error, _file: LocalFile | string) => reject(wrapPapaError(error, 'Failed to parse file.'))
+    });
+  });
+};
+
+export const parseDelimitedText = async (text: string, fileName = 'pasted.csv'): Promise<PreviewResult> => {
+  if (isLikelyHtml(text.slice(0, 2048))) {
+    throw new Error('Pasted data appears to contain HTML. Please paste raw delimited text.');
+  }
+
+  return new Promise<PreviewResult>((resolve, reject) => {
+    Papa.parse<Record<string, unknown>>(text, {
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: true,
+      preview: MAX_PREVIEW_ROWS,
+      complete: (results) => {
+        if (results.errors?.length) {
+          const firstError = results.errors[0];
+          reject(wrapPapaError(firstError, 'Failed to parse pasted data.'));
+          return;
+        }
+        const rows = Array.isArray(results.data)
+          ? results.data.filter((row): row is Record<string, unknown> => Boolean(row))
+          : [];
+        if (!rows.length) {
+          reject(new Error('No rows detected in pasted data. Ensure the first row contains column headers.'));
+          return;
+        }
+        const fields = results.meta.fields ?? Object.keys(rows[0] ?? {});
+        resolve({
+          columns: buildColumnsFromFields(fields, rows),
+          rows,
+          rowCount: rows.length,
+          truncated: rows.length >= MAX_PREVIEW_ROWS
+        });
+      },
+      error: (error: Error, _file: LocalFile | string) => reject(wrapPapaError(error, 'Failed to parse pasted data.'))
     });
   });
 };

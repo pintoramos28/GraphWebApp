@@ -24,7 +24,7 @@ Each task has a checkbox (`[ ]`) and **Refs** linking to the plan item(s) in `do
 8. [x] Excel/Parquet/Arrow import via DuckDB-WASM and Arrow adapters. **Refs:** P10; R1, R34  
 9. [x] Schema/type inference and editable type controls in grid. **Refs:** P10, P12; R2  
 10. [x] URL import with CORS handling + progress UI. **Refs:** P11; R3, R35  
-11. [ ] Clipboard paste parser with header detection. **Refs:** P11; R3  
+11. [x] Clipboard paste parser with header detection. **Refs:** P11; R3  
 12. [ ] Field metadata editor (rename, labels, units) with propagation to views. **Refs:** P12; R4  
 13. [ ] Visual filter chips (range, equals, contains, date bounds) with performance budget. **Refs:** P13; R5  
 14. [ ] Expression editor (syntax check, preview, error counts). **Refs:** P14; R6  
