@@ -311,4 +311,29 @@ To ensure **interactivity and customizability**, the visualization stack will ce
 **R46. Testing & QA Tooling**  
 **User Story:** As a developer, I want automated tests so that regressions are caught early.  
 **Acceptance Criteria:**  
-- WHEN running tests in CI THEN **Vitest/Jest + React Testing Library** SHALL run unit/integration suites and **Playwright** SHALL run E2E across Chromium/WebKit/Firefox.
+- WHEN running tests in CI THEN **Vitest/Jest + React Testing Library** SHALL run unit/integration suites and **Playwright** SHALL run E2E across Chromium/WebKit/Firefox.  
+
+---
+
+### J. Runtime Guard Rails & CI Gating (R47–R49)
+
+**R47. Browser Runtime Error Guard & Smoke Test**  
+**User Story:** As a developer, I want runtime errors to be caught automatically so that broken builds cannot pass CI.  
+**Acceptance Criteria:**  
+- WHEN running a **Playwright smoke test** against `/` THEN the system SHALL **fail** if any `pageerror`, `console.error`, or unhandled rejection occurs during app bootstrap and initial render.  
+- WHEN visiting `/` THEN a visible root container with `data-testid="app-shell"` SHALL render without errors; React render exceptions SHALL be caught by an **Error Boundary** that renders an alert UI and logs to `console.error`.  
+- WHEN a `window.unhandledrejection` occurs THEN a global hook SHALL log via `console.error` so the smoke test fails.
+
+**R48. Strict TypeScript & Unit Test Console Traps**  
+**User Story:** As a developer, I want strict compile/test settings so that runtime issues are prevented early.  
+**Acceptance Criteria:**  
+- WHEN running `pnpm check` THEN the script SHALL run `lint`, `tsc --noEmit`, **unit tests**, and the **smoke E2E** in sequence and fail on the first error.  
+- WHEN unit tests run THEN any `console.error` or `console.warn` SHALL throw and fail the test; unhandled rejections SHALL fail the test process.  
+- WHEN building the project THEN **TypeScript strict options** (e.g., `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `useUnknownInCatchVariables`) SHALL be enabled.
+
+**R49. Worker Error Propagation**  
+**User Story:** As a developer, I want worker errors to surface in tests so that data/compute issues don’t silently pass.  
+**Acceptance Criteria:**  
+- WHEN a Web Worker emits `error` or `messageerror` THEN a wrapper SHALL forward the event to `console.error`; the **smoke E2E** SHALL fail upon such logs.  
+- WHEN a non-serializable payload is posted to a worker THEN a `messageerror` SHALL be captured and surfaced.
+

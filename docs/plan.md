@@ -15,7 +15,7 @@ This plan covers how to satisfy every requirement from `docs/requirements.md`. E
 **P2. App Shell & Routing**  
 - **Reqs:** R43  
 - **Priority:** High  
-- **Deliverables:** Layout shell (sidebar for fields, central canvas, right inspector), router for /project/:id, URL state sync.  
+- **Deliverables:** Layout shell (sidebar for fields, central canvas, right inspector), router for /project/:id, URL state sync, **root `<div data-testid="app-shell">`**.  
 - **Dependencies:** P1
 
 **P3. Global State & Undo/Redo**  
@@ -39,7 +39,7 @@ This plan covers how to satisfy every requirement from `docs/requirements.md`. E
 **P6. Worker Infrastructure**  
 - **Reqs:** R34  
 - **Priority:** High  
-- **Deliverables:** Web Worker pool with message protocol, progress events, error channel.  
+- **Deliverables:** Web Worker pool with message protocol, progress events, **error channel surfaced to console**, error handling.  
 - **Dependencies:** P1, P3
 
 ---
@@ -309,9 +309,9 @@ This plan covers how to satisfy every requirement from `docs/requirements.md`. E
 - **Dependencies:** P22–P24, P41
 
 **P82. Lint/Type/Format Gates & CI**  
-- **Reqs:** R43, R46  
+- **Reqs:** R43, R46, **R47**  
 - **Priority:** High  
-- **Deliverables:** CI with lint, type, unit, e2e (smoke) jobs; merge gates.  
+- **Deliverables:** CI with lint, type, unit, **smoke E2E gating via `pnpm check`**; merge gates.  
 - **Dependencies:** P1
 
 **P83. Visual Regression (Optional)**  
@@ -328,7 +328,30 @@ This plan covers how to satisfy every requirement from `docs/requirements.md`. E
 
 ---
 
+## 10) Runtime Guard Rails & Error Surfacing
+
+**P85. Runtime Smoke & Error Guard Rails**  
+- **Reqs:** R47, R46, R35  
+- **Priority:** High  
+- **Deliverables:** Playwright **smoke** spec that navigates to `/` and fails on `pageerror`/`console.error`; global error hooks for `window.error` and `unhandledrejection`; **AppErrorBoundary** wrapping the shell; root `data-testid="app-shell"`.  
+- **Dependencies:** P1, P2
+
+**P86. Strict TS & Unit Console Traps**  
+- **Reqs:** R48, R46  
+- **Priority:** High  
+- **Deliverables:** `tsconfig` strict settings; Vitest config + setup that throws on `console.error`/`console.warn` and fails on unhandled rejections; `pnpm check` aggregator (lint + tsc + unit + smoke).  
+- **Dependencies:** P1
+
+**P87. Worker Error Propagation Wrapper**  
+- **Reqs:** R49, R34  
+- **Priority:** High  
+- **Deliverables:** `createWorker` helper that attaches `error`/`messageerror` listeners forwarding to `console.error`; usage across all workers.  
+- **Dependencies:** P6
+
+---
+
 ## Coverage Check
 
-- **All requirements R1–R46** are covered by at least one plan item above.  
-- **MVP focus:** P1–P6, P10, P13, P15, P20–P26, P22–P24, P30–P32, P34, P40–P41, P50, P53, P61, P80–P82.
+- **All requirements R1–R49** are covered by plan items.  
+- **MVP focus:** P1–P6, P10, P13, P15, P20–P26, P22–P24, P30–P32, P34, P40–P41, P50, P53, P61, P80–P82, **P85–P86**.
+
