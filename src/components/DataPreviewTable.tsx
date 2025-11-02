@@ -1,27 +1,41 @@
 'use client';
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { MenuItem, Paper, Select, Stack, Typography } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import { useImportStore } from '@/state/importStore';
+import { sanitizeColumnType, validateColumnType } from '@/lib/typeValidation';
 
 const DataPreviewTable = () => {
+  const [validationState, setValidationState] = useState<Record<string, string | null>>({});
+  const preview = useImportStore((state) => state.preview);
   const overrideColumnType = useImportStore((state) => state.overrideColumnType);
+
+  const columns = useMemo(() => preview?.columns ?? [], [preview?.columns]);
+  const rows = useMemo(() => preview?.rows ?? [], [preview?.rows]);
+  const truncated = preview?.truncated ?? false;
 
   const handleTypeChange = useCallback(
     (columnName: string, event: SelectChangeEvent<string>) => {
-      overrideColumnType(columnName, event.target.value);
-    },
-    [overrideColumnType]
-  );
+      const requestedType = sanitizeColumnType(event.target.value);
+      const { valid } = validateColumnType(rows, columnName, requestedType);
 
-  const preview = useImportStore((state) => state.preview);
+      if (valid) {
+        overrideColumnType(columnName, requestedType);
+        setValidationState((current) => ({ ...current, [columnName]: null }));
+      } else {
+        setValidationState((current) => ({
+          ...current,
+          [columnName]: `Values cannot be parsed as ${requestedType}.`
+        }));
+      }
+    },
+    [overrideColumnType, rows]
+  );
 
   if (!preview) {
     return null;
   }
-
-  const { columns, rows, truncated } = preview;
 
   return (
     <Paper
@@ -67,6 +81,15 @@ const DataPreviewTable = () => {
                         className="data-preview-table__column-original"
                       >
                         Auto type: {column.originalType}
+                      </Typography>
+                    ) : null}
+                    {validationState[column.name] ? (
+                      <Typography
+                        variant="caption"
+                        color="error"
+                        className="data-preview-table__column-error"
+                      >
+                        {validationState[column.name]}
                       </Typography>
                     ) : null}
                   </Stack>
