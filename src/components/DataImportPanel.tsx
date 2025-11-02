@@ -19,6 +19,7 @@ import { generatePreview, parseDelimitedText } from '@/lib/datasetPreview';
 import { detectFileFormat } from '@/lib/fileFormat';
 import { useImportStore } from '@/state/importStore';
 import { useAppStore } from '@/state/appStore';
+import { createFieldMetadataMap } from '@/lib/fieldMetadata';
 
 const DataImportPanel = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -76,7 +77,8 @@ const DataImportPanel = () => {
             dataset: {
               id: datasetId,
               name: file.name,
-              fieldCount: quickPreview.columns.length
+              fieldCount: quickPreview.columns.length,
+              fields: createFieldMetadataMap(quickPreview.columns)
             }
           });
         } else {
@@ -115,25 +117,17 @@ const DataImportPanel = () => {
             truncated: result.truncated
           });
 
-          if (quickPreview && result.columns.length !== quickPreview.columns.length) {
-            registerDataset({
-              type: 'datasets/register',
-              dataset: {
-                id: datasetId,
-                name: file.name,
-                fieldCount: result.columns.length
-              }
-            });
-          } else if (!quickPreview) {
-            registerDataset({
-              type: 'datasets/register',
-              dataset: {
-                id: datasetId,
-                name: file.name,
-                fieldCount: result.columns.length
-              }
-            });
-          }
+          const resultMetadata = createFieldMetadataMap(result.columns);
+
+          registerDataset({
+            type: 'datasets/register',
+            dataset: {
+              id: datasetId,
+              name: file.name,
+              fieldCount: result.columns.length,
+              fields: resultMetadata
+            }
+          });
         } else {
           updateStatus('success', 'Showing preview (post-processing skipped in this environment).');
         }
@@ -219,7 +213,8 @@ const DataImportPanel = () => {
         dataset: {
           id: datasetId,
           name: 'Pasted Data',
-          fieldCount: previewResult.columns.length
+          fieldCount: previewResult.columns.length,
+          fields: createFieldMetadataMap(previewResult.columns)
         }
       });
       setPasteWarning(null);

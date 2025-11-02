@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { FieldMetadata } from '@/lib/fieldMetadata';
 
 export type ShelfKey =
   | 'x'
@@ -16,6 +17,7 @@ export type DatasetReference = {
   id: string;
   name: string;
   fieldCount: number;
+  fields: Record<string, FieldMetadata>;
 };
 
 export type AppPresentState = {
@@ -35,7 +37,13 @@ export type AppAction =
   | { type: 'shelf/assign'; shelf: ShelfKey; fieldId: string }
   | { type: 'shelf/clear'; shelf: ShelfKey }
   | { type: 'datasets/register'; dataset: DatasetReference }
-  | { type: 'datasets/remove'; datasetId: string };
+  | { type: 'datasets/remove'; datasetId: string }
+  | {
+      type: 'datasets/updateField';
+      datasetId: string;
+      fieldId: string;
+      changes: Partial<FieldMetadata>;
+    };
 
 const HISTORY_LIMIT = 100;
 
@@ -64,6 +72,33 @@ const createInitialPresentState = (): AppPresentState => ({
 });
 
 const cloneState = (state: AppPresentState): AppPresentState => structuredClone(state);
+
+const areFieldMapsEqual = (
+  left: Record<string, FieldMetadata>,
+  right: Record<string, FieldMetadata>
+): boolean => {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+  return leftKeys.every((key) => {
+    const leftMeta = left[key];
+    if (!leftMeta) {
+      return false;
+    }
+    const rightMeta = right[key];
+    if (!rightMeta) {
+      return false;
+    }
+    return (
+      leftMeta.fieldId === rightMeta.fieldId &&
+      leftMeta.name === rightMeta.name &&
+      leftMeta.label === rightMeta.label &&
+      leftMeta.unit === rightMeta.unit
+    );
+  });
+};
 
 const applyAction = (state: AppPresentState, action: AppAction): AppPresentState => {
   switch (action.type) {
@@ -125,20 +160,52 @@ const applyAction = (state: AppPresentState, action: AppAction): AppPresentState
     case 'datasets/register': {
       const { dataset } = action;
       const existing = state.datasets[dataset.id];
+      const normalizedFields: Record<string, FieldMetadata> = Object.fromEntries(
+        Object.entries(dataset.fields ?? {}).map(([fieldId, metadata]) => [
+          fieldId,
+          { ...metadata }
+        ])
+      );
+
+      const mergedFields = existing
+        ? Object.keys(normalizedFields).reduce<Record<string, FieldMetadata>>((acc, fieldId) => {
+            const incoming = normalizedFields[fieldId]!;
+            const previous = existing.fields[fieldId];
+            if (previous) {
+              acc[fieldId] = {
+                fieldId: incoming.fieldId,
+                name: previous.name,
+                label: previous.label,
+                unit: previous.unit
+              };
+            } else {
+              acc[fieldId] = incoming;
+            }
+            return acc;
+          }, {})
+        : normalizedFields;
+
       if (
         existing &&
         existing.name === dataset.name &&
-        existing.fieldCount === dataset.fieldCount
+        existing.fieldCount === dataset.fieldCount &&
+        areFieldMapsEqual(existing.fields, mergedFields)
       ) {
         return state;
       }
+
       return {
         ...state,
         version: state.version + 1,
         lastUpdated: Date.now(),
         datasets: {
           ...state.datasets,
-          [dataset.id]: dataset
+          [dataset.id]: {
+            id: dataset.id,
+            name: dataset.name,
+            fieldCount: dataset.fieldCount,
+            fields: mergedFields
+          }
         }
       };
     }
@@ -153,6 +220,42 @@ const applyAction = (state: AppPresentState, action: AppAction): AppPresentState
         version: state.version + 1,
         lastUpdated: Date.now(),
         datasets: nextDatasets
+      };
+    }
+    case 'datasets/updateField': {
+      const dataset = state.datasets[action.datasetId];
+      if (!dataset) {
+        return state;
+      }
+      const field = dataset.fields[action.fieldId];
+      if (!field) {
+        return state;
+      }
+      const nextField: FieldMetadata = {
+        ...field,
+        ...action.changes
+      };
+      if (
+        nextField.name === field.name &&
+        nextField.label === field.label &&
+        nextField.unit === field.unit
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        version: state.version + 1,
+        lastUpdated: Date.now(),
+        datasets: {
+          ...state.datasets,
+          [action.datasetId]: {
+            ...dataset,
+            fields: {
+              ...dataset.fields,
+              [action.fieldId]: nextField
+            }
+          }
+        }
       };
     }
     default: {

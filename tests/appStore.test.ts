@@ -87,4 +87,38 @@ describe('appStore history', () => {
     expect(first.project.title).toBe('State 1');
     expect(second.project.title).toBe('State 2');
   });
+
+  it('updates dataset field metadata via dedicated action', () => {
+    resetStore();
+
+    useAppStore.getState().dispatch({
+      type: 'datasets/register',
+      dataset: {
+        id: 'ds-1',
+        name: 'metrics.csv',
+        fieldCount: 1,
+        fields: {
+          price: {
+            fieldId: 'price',
+            name: 'price',
+            label: 'Price',
+            unit: ''
+          }
+        }
+      }
+    });
+
+    const initialVersion = useAppStore.getState().present.version;
+
+    useAppStore.getState().dispatch({
+      type: 'datasets/updateField',
+      datasetId: 'ds-1',
+      fieldId: 'price',
+      changes: { label: 'Price (EUR)' }
+    });
+
+    const state = useAppStore.getState();
+    expect(state.present.version).toBe(initialVersion + 1);
+    expect(state.present.datasets['ds-1']?.fields.price?.label).toBe('Price (EUR)');
+  });
 });

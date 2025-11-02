@@ -9,8 +9,8 @@ describe('parseDelimitedText', () => {
     expect(result.rowCount).toEqual(2);
     expect(result.truncated).toBe(false);
     expect(result.columns).toEqual([
-      { name: 'team', type: 'string' },
-      { name: 'hours', type: 'number' }
+      { fieldId: 'team', name: 'team', originalName: 'team', type: 'string' },
+      { fieldId: 'hours', name: 'hours', originalName: 'hours', type: 'number' }
     ]);
     expect(result.rows[0]).toEqual({ team: 'Aurora', hours: 10 });
   });

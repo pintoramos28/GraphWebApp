@@ -1,4 +1,5 @@
 import { createWorker } from '@/workers/createWorker';
+import type { SampleColumn } from './csvUtils';
 
 type WorkerStatus = {
   id: string;
@@ -11,7 +12,7 @@ type WorkerResult = {
   id: string;
   type: 'result';
   result: {
-    columns: { name: string; type: string }[];
+    columns: SampleColumn[];
     rows: Array<Record<string, unknown>>;
     rowCount: number;
     truncated: boolean;

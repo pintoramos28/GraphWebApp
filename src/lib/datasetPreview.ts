@@ -1,11 +1,11 @@
 import Papa from 'papaparse';
 import type { LocalFile, ParseError } from 'papaparse';
 import * as XLSX from 'xlsx';
-import { buildColumnsFromFields } from './csvUtils';
+import { buildColumnsFromFields, type SampleColumn } from './csvUtils';
 import type { SupportedFormat } from './fileFormat';
 
 export type PreviewResult = {
-  columns: { name: string; type: string }[];
+  columns: SampleColumn[];
   rows: Array<Record<string, unknown>>;
   rowCount: number;
   truncated: boolean;

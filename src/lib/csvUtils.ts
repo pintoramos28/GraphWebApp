@@ -18,6 +18,13 @@ export const inferValueType = (value: unknown): string => {
   return 'string';
 };
 
+export type SampleColumn = {
+  fieldId: string;
+  name: string;
+  originalName: string;
+  type: string;
+};
+
 export const buildColumnsFromFields = (
   fields: string[],
   sampleRows: Array<Record<string, unknown>>
@@ -25,7 +32,9 @@ export const buildColumnsFromFields = (
   return fields.map((field) => {
     const sampleValue = sampleRows.find((row) => field in row)?.[field];
     return {
+      fieldId: field,
       name: field,
+      originalName: field,
       type: inferValueType(sampleValue)
     };
   });

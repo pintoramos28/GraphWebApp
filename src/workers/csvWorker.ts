@@ -8,7 +8,7 @@ import {
 } from '@duckdb/duckdb-wasm';
 import Papa from 'papaparse';
 import type { Field } from 'apache-arrow';
-import { buildColumnsFromFields } from '../lib/csvUtils';
+import { buildColumnsFromFields, type SampleColumn } from '../lib/csvUtils';
 
 type ParseRequest = {
   id: string;
@@ -30,7 +30,7 @@ type ResultResponse = {
   id: string;
   type: 'result';
   result: {
-    columns: { name: string; type: string }[];
+    columns: SampleColumn[];
     rows: Array<Record<string, unknown>>;
     rowCount: number;
     truncated: boolean;
@@ -174,11 +174,10 @@ const parseWithDuckDb = async (request: ParseRequest) => {
     const rowCount = Number(rowCountArray[0]?.row_count ?? rows.length);
     const truncated = rowCount > rows.length;
 
-    const columns =
-      previewResult.schema?.fields?.map((field: Field) => ({
-        name: field.name,
-        type: field.type?.toString?.() ?? 'unknown'
-      })) ?? [];
+    const fieldNames =
+      previewResult.schema?.fields?.map((field: Field) => field.name) ??
+      Object.keys(rows[0] ?? {});
+    const columns = buildColumnsFromFields(fieldNames, rows);
 
     await connection.close();
     await db.dropFile(virtualPath).catch(() => undefined);
