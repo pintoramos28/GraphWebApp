@@ -4,7 +4,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { MenuItem, Paper, Select, Stack, Typography } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import { useImportStore } from '@/state/importStore';
-import { sanitizeColumnType, validateColumnType } from '@/lib/typeValidation';
+import { sanitizeColumnType, validateColumnType, type ColumnType } from '@/lib/typeValidation';
 
 const DataPreviewTable = () => {
   const [validationState, setValidationState] = useState<Record<string, string | null>>({});
@@ -32,6 +32,11 @@ const DataPreviewTable = () => {
     },
     [overrideColumnType, rows]
   );
+
+  const allowedTypes = useMemo(() => {
+    const baseTypes: ColumnType[] = ['string', 'number', 'boolean', 'datetime', 'object'];
+    return baseTypes;
+  }, []);
 
   if (!preview) {
     return null;
@@ -68,11 +73,11 @@ const DataPreviewTable = () => {
                       displayEmpty
                       inputProps={{ 'aria-label': `Column type for ${column.name}` }}
                     >
-                      <MenuItem value="string">String</MenuItem>
-                      <MenuItem value="number">Number</MenuItem>
-                      <MenuItem value="boolean">Boolean</MenuItem>
-                      <MenuItem value="datetime">Datetime</MenuItem>
-                      <MenuItem value="object">Object</MenuItem>
+                      {allowedTypes.map((typeOption) => (
+                        <MenuItem key={typeOption} value={typeOption}>
+                          {typeOption.charAt(0).toUpperCase() + typeOption.slice(1)}
+                        </MenuItem>
+                      ))}
                     </Select>
                     {column.originalType && column.originalType !== column.type ? (
                       <Typography

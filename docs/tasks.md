@@ -21,8 +21,8 @@ Each task has a checkbox (`[ ]`) and **Refs** linking to the plan item(s) in `do
 
 6. [x] Implement worker pool and message protocol (progress, error); use a **`createWorker` wrapper** that forwards `error` and `messageerror` to `console.error`. **Refs:** P6, P50, **P87**; R34, **R49**  
 7. [x] CSV/TSV import via DuckDB-WASM (fallback PapaParse) with 1,000-row preview. **Refs:** P10; R1, R34  
-8. [ ] Excel/Parquet/Arrow import via DuckDB-WASM and Arrow adapters. **Refs:** P10; R1, R34  
-9. [ ] Schema/type inference and editable type controls in grid. **Refs:** P10, P12; R2  
+8. [x] Excel/Parquet/Arrow import via DuckDB-WASM and Arrow adapters. **Refs:** P10; R1, R34  
+9. [x] Schema/type inference and editable type controls in grid. **Refs:** P10, P12; R2  
 10. [ ] URL import with CORS handling + progress UI. **Refs:** P11; R3, R35  
 11. [ ] Clipboard paste parser with header detection. **Refs:** P11; R3  
 12. [ ] Field metadata editor (rename, labels, units) with propagation to views. **Refs:** P12; R4  
