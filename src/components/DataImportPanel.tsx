@@ -1,14 +1,19 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
   LinearProgress,
   Stack,
-  Typography
+  Typography,
+  TextField,
+  IconButton,
+  InputAdornment,
+  MenuItem
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import LinkIcon from '@mui/icons-material/Link';
 import { importDatasetFile } from '@/lib/importCsv';
 import { generatePreview } from '@/lib/datasetPreview';
 import { detectFileFormat } from '@/lib/fileFormat';
@@ -24,7 +29,11 @@ const DataImportPanel = () => {
   const phase = useImportStore((state) => state.phase);
   const message = useImportStore((state) => state.message);
   const preview = useImportStore((state) => state.preview);
+  const recentUrls = useImportStore((state) => state.recentUrls);
+  const addRecentUrl = useImportStore((state) => state.addRecentUrl);
   const registerDataset = useAppStore((state) => state.dispatch);
+  const [urlInput, setUrlInput] = useState('');
+  const [urlWarning, setUrlWarning] = useState<string | null>(null);
 
   const resetInput = () => {
     if (fileInputRef.current) {
@@ -32,17 +41,11 @@ const DataImportPanel = () => {
     }
   };
 
-  const handleFileChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) {
-        return;
-      }
-
+  const processFile = useCallback(
+    async (file: File) => {
       const format = detectFileFormat(file.name);
       if (!format) {
         setError('Unsupported file type. Please select CSV, TSV, Parquet, Arrow, or Excel files.');
-        resetInput();
         return;
       }
 
@@ -133,13 +136,57 @@ const DataImportPanel = () => {
           updateStatus('success', 'Showing preview (post-processing skipped in this environment).');
         }
       } catch (error) {
-        console.error('CSV import failed', error);
+        console.error('Dataset import failed', error);
         setError(error instanceof Error ? error.message : 'Failed to import file');
       } finally {
         resetInput();
       }
     },
     [registerDataset, setError, setPreview, startImport, updateStatus]
+  );
+
+  const handleFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        return;
+      }
+      await processFile(file);
+    },
+    [processFile]
+  );
+
+  const handleUrlImport = useCallback(
+    async (url: string) => {
+      const trimmed = url.trim();
+      if (!trimmed) {
+        setUrlWarning('Please enter a URL.');
+        return;
+      }
+
+      try {
+        const response = await fetch(trimmed, { credentials: 'omit' });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch data (status ${response.status}).`);
+        }
+        const buffer = await response.arrayBuffer();
+        const contentType = response.headers.get('Content-Type') ?? '';
+        const baseUrl = typeof window !== 'undefined' ? window.location.href : 'http://localhost';
+        const urlPath = new URL(trimmed, baseUrl).pathname;
+        const inferredName = urlPath.split('/').filter(Boolean).pop() ?? 'dataset';
+        const inferredFormat = detectFileFormat(inferredName) ?? detectFileFormat(contentType) ?? 'csv';
+        const normalizedName = inferredName.includes('.') ? inferredName : `${inferredName}.${inferredFormat}`;
+
+        const file = new File([buffer], normalizedName, { type: contentType });
+        addRecentUrl(trimmed);
+        await processFile(file);
+        setUrlInput(trimmed);
+      } catch (error) {
+        console.error('URL import failed', error);
+        setError(error instanceof Error ? error.message : 'Failed to import URL');
+      }
+    },
+    [addRecentUrl, processFile, setError]
   );
 
   const showProgress = phase === 'loading' || phase === 'parsing' || phase === 'counting';
@@ -171,6 +218,57 @@ const DataImportPanel = () => {
           Select CSV / TSV
         </Button>
       </div>
+
+      <Stack spacing={1} direction="column">
+        <TextField
+          label="Import from URL"
+          placeholder="https://example.com/data.csv"
+          value={urlInput}
+          onChange={(event) => {
+            setUrlInput(event.target.value);
+            setUrlWarning(null);
+          }}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  aria-label="Import dataset from URL"
+                  onClick={() => handleUrlImport(urlInput)}
+                  edge="end"
+                  data-testid="dataset-url-import"
+                >
+                  <LinkIcon />
+                </IconButton>
+              </InputAdornment>
+            )
+          }}
+          error={Boolean(urlWarning)}
+          helperText={urlWarning ?? 'Supports CSV, TSV, Parquet, Arrow, and Excel files.'}
+        />
+        {recentUrls.length > 0 ? (
+          <TextField
+            select
+            label="Recent URLs"
+            value=""
+            onChange={(event) => {
+              const selected = event.target.value;
+              setUrlWarning(null);
+              setUrlInput(selected);
+              handleUrlImport(selected);
+            }}
+            InputProps={{ 'aria-label': 'Recent data URLs' }}
+          >
+            <MenuItem value="" disabled>
+              Select a recent URL
+            </MenuItem>
+            {recentUrls.map((entry) => (
+              <MenuItem key={entry} value={entry}>
+                {entry}
+              </MenuItem>
+            ))}
+          </TextField>
+        ) : null}
+      </Stack>
 
       {showProgress && <LinearProgress variant="indeterminate" aria-label="Importing dataset" />}
 

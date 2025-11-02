@@ -62,6 +62,22 @@ test.describe('smoke guard rails', () => {
     await page.getByRole('option', { name: 'String' }).click();
     await expect(typeSelector).toContainText('String');
 
+    await page.route('**/sample-url.csv', async (route) => {
+      const csv = 'team,hours\nOrion,20\nHelios,18';
+      await route.fulfill({
+        status: 200,
+        body: csv,
+        headers: {
+          'Content-Type': 'text/csv'
+        }
+      });
+    });
+
+    await page.getByLabel('Import from URL').fill('https://example.com/sample-url.csv');
+    await page.getByTestId('dataset-url-import').click();
+
+    await expect(page.getByTestId('data-preview-table')).toContainText('Orion');
+
     expect(pageErrors, 'pageerror events should fail the smoke test').toHaveLength(0);
     expect(consoleErrors, 'console.error calls should fail the smoke test').toHaveLength(0);
     expect(unhandledRejections, 'unhandled rejections should fail the smoke test').toHaveLength(0);

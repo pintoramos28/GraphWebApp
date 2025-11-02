@@ -46,4 +46,14 @@ describe('importStore columns', () => {
     expect(column?.type).toEqual('string');
     expect(column?.originalType).toEqual('string');
   });
+
+  it('tracks recent URLs with uniqueness', () => {
+    useImportStore.getState().addRecentUrl('https://example.com/a.csv');
+    useImportStore.getState().addRecentUrl('https://example.com/b.csv');
+    useImportStore.getState().addRecentUrl('https://example.com/a.csv');
+
+    const recent = useImportStore.getState().recentUrls;
+    expect(recent[0]).toEqual('https://example.com/a.csv');
+    expect(recent[1]).toEqual('https://example.com/b.csv');
+  });
 });

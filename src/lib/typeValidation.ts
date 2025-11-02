@@ -89,9 +89,15 @@ export const validateColumnType = (
     }
   }
 
+  if (invalidValues.length > 0) {
+    return {
+      valid: false,
+      invalidSample: invalidValues
+    };
+  }
+
   return {
-    valid: invalidValues.length === 0,
-    invalidSample: invalidValues.length ? invalidValues : undefined
+    valid: true
   };
 };
 

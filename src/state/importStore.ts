@@ -22,11 +22,13 @@ type ImportStoreState = {
   message: string | null;
   currentFile: string | null;
   preview: DatasetPreview | null;
+  recentUrls: string[];
   startImport: (fileName: string) => void;
   updateStatus: (phase: ImportStatusPhase, message?: string) => void;
   setPreview: (preview: DatasetPreview) => void;
   setError: (message: string) => void;
   overrideColumnType: (columnName: string, newType: string) => void;
+  addRecentUrl: (url: string) => void;
   reset: () => void;
 };
 
@@ -35,6 +37,7 @@ export const useImportStore = create<ImportStoreState>((set) => ({
   message: null,
   currentFile: null,
   preview: null,
+  recentUrls: [],
   startImport: (fileName: string) =>
     set({
       phase: 'loading',
@@ -102,6 +105,14 @@ export const useImportStore = create<ImportStoreState>((set) => ({
               : column
           )
         }
+      };
+    }),
+  addRecentUrl: (url) =>
+    set((state) => {
+      const updated = [url, ...state.recentUrls.filter((entry) => entry !== url)].slice(0, 5);
+      return {
+        ...state,
+        recentUrls: updated
       };
     }),
   reset: () =>
