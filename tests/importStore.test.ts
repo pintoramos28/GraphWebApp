@@ -118,9 +118,9 @@ describe('importStore columns', () => {
     expect(useImportStore.getState().filteredRowCount).toEqual(2);
   });
 
-  it('adds derived columns via expressions', () => {
+  it('adds derived columns via expressions', async () => {
     useImportStore.getState().setPreview(createPreview({}));
-    useImportStore.getState().addDerivedColumn('HoursSquared', 'hours * hours');
+    await useImportStore.getState().addDerivedColumn('HoursSquared', 'hours * hours');
 
     const state = useImportStore.getState();
     const derivedColumn = state.preview?.columns.find((column) => column.name === 'HoursSquared');
@@ -130,5 +130,18 @@ describe('importStore columns', () => {
 
     useImportStore.getState().removeDerivedColumn(state.derivedColumns[0]!.id);
     expect(useImportStore.getState().preview?.columns.find((column) => column.name === 'HoursSquared')).toBeUndefined();
+  });
+
+  it('updates derived columns via expressions', async () => {
+    useImportStore.getState().setPreview(createPreview({}));
+    await useImportStore.getState().addDerivedColumn('HoursSquared', 'hours * hours');
+    const derivedId = useImportStore.getState().derivedColumns[0]!.id;
+
+    await useImportStore.getState().updateDerivedColumn(derivedId, 'HoursCubed', 'hours * hours * hours');
+
+    const state = useImportStore.getState();
+    const derivedColumn = state.preview?.columns.find((column) => column.fieldId === state.derivedColumns[0]!.fieldId);
+    expect(derivedColumn?.name).toEqual('HoursCubed');
+    expect(state.preview?.rows[0]?.[derivedColumn!.fieldId]).toEqual(1000);
   });
 });

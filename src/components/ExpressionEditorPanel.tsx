@@ -18,20 +18,24 @@ import {
   TextField,
   Typography
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import { buildVariableNameMap, useImportStore } from '@/state/importStore';
 
 const ExpressionEditorPanel = () => {
   const preview = useImportStore((state) => state.preview);
   const derivedColumns = useImportStore((state) => state.derivedColumns);
   const addDerivedColumn = useImportStore((state) => state.addDerivedColumn);
+  const updateDerivedColumn = useImportStore((state) => state.updateDerivedColumn);
   const removeDerivedColumn = useImportStore((state) => state.removeDerivedColumn);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [expressionInput, setExpressionInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const variableMap = useMemo(() => {
     if (!preview) {
@@ -40,29 +44,57 @@ const ExpressionEditorPanel = () => {
     return buildVariableNameMap(preview.columns).map(({ name, variable }) => ({ name, variable }));
   }, [preview]);
 
-  const handleOpenDialog = () => {
-    setDialogOpen(true);
-    setNameInput('');
-    setExpressionInput('');
+  const handleOpenDialog = (columnId?: string) => {
     setError(null);
+    setSubmitting(false);
+    if (columnId) {
+      const column = derivedColumns.find((entry) => entry.id === columnId);
+      if (column) {
+        setEditingId(column.id);
+        setNameInput(column.name);
+        setExpressionInput(column.expression);
+      }
+    } else {
+      setEditingId(null);
+      setNameInput('');
+      setExpressionInput('');
+    }
+    setDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
+    if (submitting) {
+      return;
+    }
     setDialogOpen(false);
+    setEditingId(null);
     setError(null);
+    setSubmitting(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!preview) {
+      setError('Import a dataset before defining expressions.');
+      return;
+    }
     try {
-      addDerivedColumn(nameInput, expressionInput);
-      handleCloseDialog();
+      setSubmitting(true);
+      if (editingId) {
+        await updateDerivedColumn(editingId, nameInput, expressionInput);
+      } else {
+        await addDerivedColumn(nameInput, expressionInput);
+      }
+      setDialogOpen(false);
+      setEditingId(null);
+      setSubmitting(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add expression');
+      setSubmitting(false);
+      setError(err instanceof Error ? err.message : 'Failed to save expression');
     }
   };
 
   return (
-    <Stack spacing={2} padding={2}>
+    <Stack spacing={2} padding={2} data-testid="expression-panel">
       <Typography variant="h6">Expressions</Typography>
       {derivedColumns.length ? (
         <List dense disablePadding>
@@ -87,7 +119,19 @@ const ExpressionEditorPanel = () => {
                 }
               />
               <ListItemSecondaryAction>
-                <IconButton edge="end" aria-label="Delete expression" onClick={() => removeDerivedColumn(column.id)}>
+                <IconButton
+                  edge="end"
+                  aria-label="Edit expression"
+                  onClick={() => handleOpenDialog(column.id)}
+                  sx={{ marginRight: 1 }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+                <IconButton
+                  edge="end"
+                  aria-label="Delete expression"
+                  onClick={() => removeDerivedColumn(column.id)}
+                >
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </ListItemSecondaryAction>
@@ -103,20 +147,24 @@ const ExpressionEditorPanel = () => {
         variant="contained"
         size="small"
         startIcon={<AddIcon />}
-        onClick={handleOpenDialog}
+        onClick={() => handleOpenDialog()}
         disabled={!preview}
       >
         Add expression
       </Button>
 
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Add expression</DialogTitle>
+        <DialogTitle>{editingId ? 'Edit expression' : 'Add expression'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} marginTop={1}>
             {!preview ? (
               <Alert severity="info">Import data to define expressions.</Alert>
             ) : (
               <>
+                <Alert severity="info">
+                  Expressions support arithmetic (+, -, *, /, %), comparisons (&lt;, &gt;, ==), logical operators, and
+                  math functions such as abs, sqrt, min, max, log, sin, cos, tan, etc.
+                </Alert>
                 <TextField
                   label="Column name"
                   value={nameInput}
@@ -134,9 +182,6 @@ const ExpressionEditorPanel = () => {
                   multiline
                   minRows={2}
                 />
-                <Typography variant="caption" color="text.secondary">
-                  Use the variable names below when referencing columns. Standard Math functions are supported.
-                </Typography>
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
                     Available variables
@@ -147,6 +192,11 @@ const ExpressionEditorPanel = () => {
                         {entry.name} → <code>{entry.variable}</code>
                       </Typography>
                     ))}
+                    {variableMap.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        No columns available in the current preview.
+                      </Typography>
+                    ) : null}
                   </Stack>
                 </Box>
                 {error ? <Alert severity="error">{error}</Alert> : null}
@@ -155,9 +205,15 @@ const ExpressionEditorPanel = () => {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" disabled={!preview}>
-            Save
+          <Button onClick={handleCloseDialog} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            disabled={!preview || submitting}
+          >
+            {submitting ? 'Saving…' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -10,6 +10,7 @@ import {
 } from '@/lib/datasetFilters';
 import { Parser, type Value } from 'expr-eval';
 import { inferValueType } from '@/lib/csvUtils';
+import { createWorker } from '@/workers/createWorker';
 
 export type PreviewColumn = {
   fieldId: string;
@@ -78,7 +79,8 @@ type ImportStoreState = {
   updateFilter: (filterId: DatasetFilterId, updates: Partial<DatasetFilter>) => void;
   removeFilter: (filterId: DatasetFilterId) => void;
   clearFilters: () => void;
-  addDerivedColumn: (name: string, expression: string) => void;
+  addDerivedColumn: (name: string, expression: string) => Promise<void>;
+  updateDerivedColumn: (columnId: string, name: string, expression: string) => Promise<void>;
   removeDerivedColumn: (columnId: string) => void;
   addRecentUrl: (url: string) => void;
   reset: () => void;
@@ -203,7 +205,7 @@ const evaluateExpression = (
   };
 };
 
-export const useImportStore = create<ImportStoreState>((set) => ({
+export const useImportStore = create<ImportStoreState>((set, get) => ({
   phase: 'idle',
   message: null,
   currentFile: null,
@@ -579,87 +581,176 @@ export const useImportStore = create<ImportStoreState>((set) => ({
         message: null
       };
     }),
-  addDerivedColumn: (name, expression) =>
-    set((state) => {
-      if (!state.preview) {
-        throw new Error('Load a dataset before adding expressions.');
-      }
-      const trimmedName = name.trim();
-      if (!trimmedName.length) {
-        throw new Error('Expression name cannot be empty.');
-      }
-      const evaluation = evaluateExpression(state.preview.rows, state.preview.columns, expression);
+  addDerivedColumn: async (name, expression) => {
+    const state = get();
+    if (!state.preview) {
+      throw new Error('Import a dataset before adding expressions.');
+    }
+    const trimmedName = name.trim();
+    if (!trimmedName.length) {
+      throw new Error('Expression name cannot be empty.');
+    }
+    if (state.preview.columns.some((column) => column.name === trimmedName)) {
+      throw new Error(`A column named "${trimmedName}" already exists.`);
+    }
+    const evaluation = evaluateExpression(state.preview.rows, state.preview.columns, expression);
 
-      const fieldIdBase = trimmedName
-        .trim()
-        .replace(/[^a-zA-Z0-9_]/g, '_')
-        .replace(/_{2,}/g, '_')
-        .replace(/^\d+/, 'col_')
-        .toLowerCase();
-      let fieldId = fieldIdBase || `derived_${state.derivedColumns.length + 1}`;
-      const existingFieldIds = new Set(state.preview.columns.map((column) => column.fieldId));
-      let suffix = 1;
-      while (existingFieldIds.has(fieldId)) {
-        fieldId = `${fieldIdBase}_${suffix++}`;
-      }
+    const fieldIdBase = trimmedName
+      .trim()
+      .replace(/[^a-zA-Z0-9_]/g, '_')
+      .replace(/_{2,}/g, '_')
+      .replace(/^\d+/, 'col_')
+      .toLowerCase();
+    let fieldId = fieldIdBase || `derived_${state.derivedColumns.length + 1}`;
+    const existingFieldIds = new Set(state.preview.columns.map((column) => column.fieldId));
+    let suffix = 1;
+    while (existingFieldIds.has(fieldId)) {
+      fieldId = `${fieldIdBase || 'derived'}_${suffix++}`;
+    }
 
-      const newRows = state.preview.rows.map((row, index) => ({
-        ...row,
-        [fieldId]: evaluation.values[index]
-      }));
+    const newRows = state.preview.rows.map((row, index) => ({
+      ...row,
+      [fieldId]: evaluation.values[index]
+    }));
 
-      const newColumn: PreviewColumn = {
-        fieldId,
-        name: trimmedName,
-        originalName: trimmedName,
-        type: evaluation.type,
-        originalType: evaluation.type,
-        label: trimmedName,
-        unit: '',
-        hasLabelOverride: false,
-        hasUnitOverride: false
-      };
+    const newColumn: PreviewColumn = {
+      fieldId,
+      name: trimmedName,
+      originalName: trimmedName,
+      type: evaluation.type,
+      originalType: evaluation.type,
+      label: trimmedName,
+      unit: '',
+      hasLabelOverride: false,
+      hasUnitOverride: false
+    };
 
-      const derivedColumn: DerivedColumn = {
-        id: generateDerivedId(),
-        fieldId,
-        name: trimmedName,
-        expression,
-        lastEvaluatedAt: Date.now(),
-        sampleValues: evaluation.sampleValues,
-        errorCount: evaluation.errors
-      };
+    const derivedColumn: DerivedColumn = {
+      id: generateDerivedId(),
+      fieldId,
+      name: trimmedName,
+      expression,
+      lastEvaluatedAt: Date.now(),
+      sampleValues: evaluation.sampleValues,
+      errorCount: evaluation.errors
+    };
 
-      const previewWithDerived: PreviewForComputation = {
+    const filteredPreview = computeFilteredPreview(
+      {
         datasetId: state.preview.datasetId,
         fileName: state.preview.fileName,
         rowCount: state.preview.rowCount,
         truncated: state.preview.truncated,
         columns: [...state.preview.columns, newColumn],
         rows: newRows
-      };
+      },
+      state.filters
+    );
 
-      const filteredPreview = computeFilteredPreview(previewWithDerived, state.filters);
+    set((current) => ({
+      ...current,
+      derivedColumns: [...current.derivedColumns, derivedColumn],
+      preview: current.preview
+        ? {
+            ...current.preview,
+            rows: newRows,
+            columns: [...current.preview.columns, newColumn],
+            filteredRows: filteredPreview.filteredRows,
+            filteredRowCount: filteredPreview.filteredRowCount
+          }
+        : current.preview,
+      filteredRows: filteredPreview.filteredRows,
+      filteredRowCount: filteredPreview.filteredRowCount,
+      lastFilterDurationMs: filteredPreview.durationMs,
+      message:
+        evaluation.errors > 0
+          ? `${evaluation.errors} rows could not be evaluated; values defaulted to null.`
+          : current.message
+    }));
+  },
+  updateDerivedColumn: async (columnId, name, expression) => {
+    const state = get();
+    if (!state.preview) {
+      throw new Error('Import a dataset before editing expressions.');
+    }
+    const existing = state.derivedColumns.find((column) => column.id === columnId);
+    if (!existing) {
+      throw new Error('Unknown expression.');
+    }
+    const trimmedName = name.trim();
+    if (!trimmedName.length) {
+      throw new Error('Expression name cannot be empty.');
+    }
+    const existingDuplicate = state.preview.columns.find(
+      (column) => column.name === trimmedName && column.fieldId !== existing.fieldId
+    );
+    if (existingDuplicate) {
+      throw new Error(`A column named "${trimmedName}" already exists.`);
+    }
+    const evaluation = evaluateExpression(state.preview.rows, state.preview.columns.filter((column) => column.fieldId !== existing.fieldId), expression);
 
-      return {
-        ...state,
-        derivedColumns: [...state.derivedColumns, derivedColumn],
-        preview: {
-          ...state.preview,
-          rows: newRows,
-          columns: [...state.preview.columns, newColumn],
-          filteredRows: filteredPreview.filteredRows,
-          filteredRowCount: filteredPreview.filteredRowCount
-        },
-        filteredRows: filteredPreview.filteredRows,
-        filteredRowCount: filteredPreview.filteredRowCount,
-        lastFilterDurationMs: filteredPreview.durationMs,
-        message:
-          evaluation.errors > 0
-            ? `${evaluation.errors} rows could not be evaluated; values defaulted to null.`
-            : state.message
-      };
-    }),
+    const fieldId = existing.fieldId;
+    const newRows = state.preview.rows.map((row, index) => ({
+      ...row,
+      [fieldId]: evaluation.values[index]
+    }));
+
+    const updatedColumn: DerivedColumn = {
+      ...existing,
+      name: trimmedName,
+      expression,
+      lastEvaluatedAt: Date.now(),
+      sampleValues: evaluation.sampleValues,
+      errorCount: evaluation.errors
+    };
+
+    const previewColumns = state.preview.columns.map((column) =>
+      column.fieldId === fieldId
+        ? {
+            ...column,
+            name: trimmedName,
+            label: trimmedName,
+            type: evaluation.type,
+            originalType: evaluation.type
+          }
+        : column
+    );
+
+    const filteredPreview = computeFilteredPreview(
+      {
+        datasetId: state.preview.datasetId,
+        fileName: state.preview.fileName,
+        rowCount: state.preview.rowCount,
+        truncated: state.preview.truncated,
+        columns: previewColumns,
+        rows: newRows
+      },
+      state.filters
+    );
+
+    set((current) => ({
+      ...current,
+      derivedColumns: current.derivedColumns.map((column) =>
+        column.id === columnId ? updatedColumn : column
+      ),
+      preview: current.preview
+        ? {
+            ...current.preview,
+            rows: newRows,
+            columns: previewColumns,
+            filteredRows: filteredPreview.filteredRows,
+            filteredRowCount: filteredPreview.filteredRowCount
+          }
+        : current.preview,
+      filteredRows: filteredPreview.filteredRows,
+      filteredRowCount: filteredPreview.filteredRowCount,
+      lastFilterDurationMs: filteredPreview.durationMs,
+      message:
+        evaluation.errors > 0
+          ? `${evaluation.errors} rows could not be evaluated; values defaulted to null.`
+          : current.message
+    }));
+  },
   removeDerivedColumn: (columnId) =>
     set((state) => {
       if (!state.preview) {
