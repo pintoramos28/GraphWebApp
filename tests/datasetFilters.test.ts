@@ -68,6 +68,14 @@ describe('datasetFilters', () => {
     expect(filteredRows[0]?.category).toBe('Beta');
   });
 
+  it('applies oneOf filters to dataset', () => {
+    const { filteredRows, filteredRowCount } = applyDatasetFilters(rows, [...columns], [
+      { id: 'f1', columnId: 'category', kind: 'oneOf', values: ['Alpha', 'Beta'] }
+    ]);
+    expect(filteredRowCount).toBe(2);
+    expect(filteredRows.map((row) => row.category)).toEqual(['Alpha', 'Beta']);
+  });
+
   it('describes filters', () => {
     const description = describeFilter(
       { id: 'f1', columnId: 'value', kind: 'range', min: 5, max: 10 },
@@ -76,5 +84,14 @@ describe('datasetFilters', () => {
     expect(description).toContain('value');
     expect(description).toContain('≥ 5');
     expect(description).toContain('≤ 10');
+  });
+
+  it('describes oneOf filters', () => {
+    const description = describeFilter(
+      { id: 'f1', columnId: 'category', kind: 'oneOf', values: ['Alpha', 'Beta'] },
+      columns[1]
+    );
+    expect(description).toContain('Alpha');
+    expect(description).toContain('Beta');
   });
 });

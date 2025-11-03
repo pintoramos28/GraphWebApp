@@ -105,4 +105,16 @@ describe('importStore columns', () => {
     useImportStore.getState().clearFilters();
     expect(useImportStore.getState().filteredRowCount).toEqual(2);
   });
+
+  it('filters datasets via value selection filter', () => {
+    useImportStore.getState().setPreview(createPreview({}));
+    useImportStore.getState().addFilter({ columnId: 'team', kind: 'oneOf', values: ['Aurora'] });
+
+    const state = useImportStore.getState();
+    expect(state.filteredRowCount).toEqual(1);
+    expect(state.filteredRows[0]?.team).toEqual('Aurora');
+
+    useImportStore.getState().clearFilters();
+    expect(useImportStore.getState().filteredRowCount).toEqual(2);
+  });
 });

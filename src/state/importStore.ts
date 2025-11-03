@@ -472,7 +472,7 @@ export const useImportStore = create<ImportStoreState>((set) => ({
         filteredRows: state.preview.rows,
         filteredRowCount: state.preview.rows.length,
         lastFilterDurationMs: null,
-        message: state.message
+        message: null
       };
     }),
   addRecentUrl: (url) =>

@@ -64,9 +64,8 @@ test.describe('smoke guard rails', () => {
     await expect(typeSelector).toContainText('String');
 
     await page.getByTestId('filter-add-button').click();
-    await page.getByLabel('Filter type').click();
-    await page.getByRole('option', { name: 'Equals' }).click();
-    await page.getByRole('textbox', { name: /^Value$/ }).fill('Nimbus');
+    await page.getByRole('checkbox', { name: 'Aurora' }).uncheck();
+    await page.getByRole('checkbox', { name: 'Zenith' }).uncheck();
     await page.getByTestId('filter-submit-button').click();
 
     await expect(page.getByTestId('data-preview-table')).toContainText('Nimbus');

@@ -30,12 +30,23 @@ export type DateRangeFilter = FilterBase & {
   end?: string | null;
 };
 
-export type DatasetFilter = RangeFilter | EqualsFilter | ContainsFilter | DateRangeFilter;
+export type OneOfFilter = FilterBase & {
+  kind: 'oneOf';
+  values: Array<string | number | boolean>;
+};
+
+export type DatasetFilter =
+  | RangeFilter
+  | EqualsFilter
+  | ContainsFilter
+  | DateRangeFilter
+  | OneOfFilter;
 export type NewDatasetFilter =
   | Omit<RangeFilter, 'id'>
   | Omit<EqualsFilter, 'id'>
   | Omit<ContainsFilter, 'id'>
-  | Omit<DateRangeFilter, 'id'>;
+  | Omit<DateRangeFilter, 'id'>
+  | Omit<OneOfFilter, 'id'>;
 
 type ColumnLookup = Record<string, PreviewColumn | undefined>;
 
@@ -163,6 +174,29 @@ const matchesDateRange = (value: unknown, filter: DateRangeFilter, column: Previ
   return true;
 };
 
+const matchesOneOf = (value: unknown, filter: OneOfFilter, column: PreviewColumn | undefined) => {
+  if (!filter.values.length) {
+    return true;
+  }
+  const normalized = normalizeValue(value, column);
+  if (normalized === null || normalized === undefined) {
+    return false;
+  }
+  return filter.values.some((candidate) => {
+    if (column?.type === 'number') {
+      return Number(normalized) === Number(candidate);
+    }
+    if (column?.type === 'boolean') {
+      return Boolean(normalized) === Boolean(candidate);
+    }
+    if (column?.type === 'datetime') {
+      const candidateDate = new Date(String(candidate));
+      return normalized instanceof Date && !Number.isNaN(candidateDate.getTime()) && normalized.getTime() === candidateDate.getTime();
+    }
+    return String(normalized) === String(candidate);
+  });
+};
+
 export const rowMatchesFilters = (
   row: Record<string, unknown>,
   filters: DatasetFilter[],
@@ -181,12 +215,14 @@ export const rowMatchesFilters = (
         return matchesEquals(value, filter, column);
       case 'contains':
         return matchesContains(value, filter);
-      case 'dateRange':
-        return matchesDateRange(value, filter, column);
-      default:
-        return true;
-    }
-  });
+    case 'dateRange':
+      return matchesDateRange(value, filter, column);
+    case 'oneOf':
+      return matchesOneOf(value, filter, column);
+    default:
+      return true;
+  }
+});
 };
 
 export const applyDatasetFilters = (
@@ -244,6 +280,10 @@ export const describeFilter = (filter: DatasetFilter, column: PreviewColumn | un
         parts.push(`≤ ${new Date(filter.end).toLocaleString()}`);
       }
       return `${columnName}: ${parts.join(' and ') || 'Date range'}`;
+    }
+    case 'oneOf': {
+      const values = filter.values.map((value) => String(value)).join(', ');
+      return `${columnName} ∈ {${values || '—'}}`;
     }
     default:
       return columnName;

@@ -2,13 +2,16 @@
 
 import { useMemo, useState } from 'react';
 import {
+  Alert,
   Button,
+  Checkbox,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   FormHelperText,
   InputLabel,
   MenuItem,
@@ -33,6 +36,23 @@ import { useImportStore } from '@/state/importStore';
 
 type DialogMode = 'create' | 'edit';
 
+type ColumnValueOption = {
+  key: string;
+  label: string;
+  raw: string | number | boolean;
+};
+
+const valueKeyFromRaw = (value: string | number | boolean): string => {
+  return `${typeof value}:${String(value)}`;
+};
+
+const labelFromRaw = (value: string | number | boolean): string => {
+  if (typeof value === 'boolean') {
+    return value ? 'True' : 'False';
+  }
+  return String(value);
+};
+
 type FilterFormState = {
   columnId: string;
   kind: DatasetFilter['kind'];
@@ -43,6 +63,7 @@ type FilterFormState = {
   caseSensitive: boolean;
   dateStart: string;
   dateEnd: string;
+  selectedKeys: string[];
 };
 
 const defaultFormState: FilterFormState = {
@@ -54,7 +75,8 @@ const defaultFormState: FilterFormState = {
   containsValue: '',
   caseSensitive: false,
   dateStart: '',
-  dateEnd: ''
+  dateEnd: '',
+  selectedKeys: []
 };
 
 const getDefaultKindForColumn = (columnType: string): DatasetFilter['kind'] => {
@@ -64,9 +86,9 @@ const getDefaultKindForColumn = (columnType: string): DatasetFilter['kind'] => {
     case 'datetime':
       return 'dateRange';
     case 'boolean':
-      return 'equals';
+      return 'oneOf';
     default:
-      return 'contains';
+      return 'oneOf';
   }
 };
 
@@ -77,10 +99,18 @@ const getAllowedKinds = (columnType: string): DatasetFilter['kind'][] => {
     case 'datetime':
       return ['dateRange', 'equals'];
     case 'boolean':
-      return ['equals'];
+      return ['oneOf', 'equals'];
     default:
-      return ['contains', 'equals'];
+      return ['oneOf', 'contains', 'equals'];
   }
+};
+
+const kindLabelMap: Record<DatasetFilter['kind'], string> = {
+  range: 'Range',
+  equals: 'Equals',
+  contains: 'Contains',
+  dateRange: 'Date range',
+  oneOf: 'Value list'
 };
 
 const parseNumberOrNull = (value: string): number | null | undefined => {
@@ -111,6 +141,38 @@ const DatasetFiltersPanel = () => {
     [columns]
   );
 
+  const valueOptionsByColumn = useMemo(() => {
+    const result = new Map<string, ColumnValueOption[]>();
+    if (!preview) {
+      return result;
+    }
+    columns.forEach((column) => {
+      if (column.type !== 'string' && column.type !== 'boolean') {
+        return;
+      }
+      const seen = new Map<string, ColumnValueOption>();
+      preview.rows.forEach((row) => {
+        const raw = row[column.fieldId];
+        if (raw === null || raw === undefined) {
+          return;
+        }
+        if (typeof raw !== 'string' && typeof raw !== 'boolean') {
+          return;
+        }
+        const key = valueKeyFromRaw(raw);
+        if (!seen.has(key)) {
+          seen.set(key, {
+            key,
+            label: labelFromRaw(raw),
+            raw
+          });
+        }
+      });
+      result.set(column.fieldId, Array.from(seen.values()));
+    });
+    return result;
+  }, [columns, preview]);
+
   const selectedColumn = columnsById.get(formState.columnId);
   const allowedKinds = selectedColumn ? getAllowedKinds(selectedColumn.type) : [];
 
@@ -131,7 +193,11 @@ const DatasetFiltersPanel = () => {
         containsValue: filter.kind === 'contains' ? filter.value : '',
         caseSensitive: filter.kind === 'contains' ? Boolean(filter.caseSensitive) : false,
         dateStart: filter.kind === 'dateRange' && filter.start ? filter.start.slice(0, 10) : '',
-        dateEnd: filter.kind === 'dateRange' && filter.end ? filter.end.slice(0, 10) : ''
+        dateEnd: filter.kind === 'dateRange' && filter.end ? filter.end.slice(0, 10) : '',
+        selectedKeys:
+          filter.kind === 'oneOf'
+            ? filter.values.map((value) => valueKeyFromRaw(value))
+            : []
       });
       if (!columnsById.has(filter.columnId) && column) {
         setFormState((prev) => ({ ...prev, columnId: column.fieldId }));
@@ -139,10 +205,13 @@ const DatasetFiltersPanel = () => {
     } else {
       setEditingFilterId(null);
       const firstColumn = columns[0];
+      const defaultKind = firstColumn ? getDefaultKindForColumn(firstColumn.type) : 'equals';
+      const initialOptions = firstColumn ? valueOptionsByColumn.get(firstColumn.fieldId) ?? [] : [];
       setFormState({
         ...defaultFormState,
         columnId: firstColumn?.fieldId ?? '',
-        kind: firstColumn ? getDefaultKindForColumn(firstColumn.type) : 'equals'
+        kind: defaultKind,
+        selectedKeys: defaultKind === 'oneOf' ? initialOptions.map((option) => option.key) : []
       });
     }
     setFormError(null);
@@ -159,22 +228,26 @@ const DatasetFiltersPanel = () => {
   const handleColumnChange = (event: SelectChangeEvent<string>) => {
     const columnId = event.target.value;
     const column = columnsById.get(columnId);
+    const options = column ? valueOptionsByColumn.get(column.fieldId) ?? [] : [];
+    const nextKind = column ? getDefaultKindForColumn(column.type) : formState.kind;
     setFormState((prev) => ({
       ...prev,
       columnId,
-      kind: column ? getDefaultKindForColumn(column.type) : prev.kind,
+      kind: nextKind,
       rangeMin: '',
       rangeMax: '',
       equalsValue: '',
       containsValue: '',
       caseSensitive: false,
       dateStart: '',
-      dateEnd: ''
+      dateEnd: '',
+      selectedKeys: nextKind === 'oneOf' ? options.map((option) => option.key) : []
     }));
   };
 
   const handleKindChange = (event: SelectChangeEvent<DatasetFilter['kind']>) => {
     const kind = event.target.value as DatasetFilter['kind'];
+    const options = selectedColumn ? valueOptionsByColumn.get(selectedColumn.fieldId) ?? [] : [];
     setFormState((prev) => ({
       ...prev,
       kind,
@@ -184,7 +257,8 @@ const DatasetFiltersPanel = () => {
       containsValue: '',
       caseSensitive: false,
       dateStart: '',
-      dateEnd: ''
+      dateEnd: '',
+      selectedKeys: kind === 'oneOf' ? options.map((option) => option.key) : []
     }));
   };
 
@@ -272,6 +346,19 @@ const DatasetFiltersPanel = () => {
         }
         return payload;
       }
+      case 'oneOf': {
+        const options = valueOptionsByColumn.get(columnId) ?? [];
+        const selected = options.filter((option) => formState.selectedKeys.includes(option.key));
+        if (!selected.length) {
+          setFormError('Select at least one value.');
+          return null;
+        }
+        return {
+          columnId,
+          kind: 'oneOf',
+          values: selected.map((option) => option.raw)
+        };
+      }
       default:
         return null;
     }
@@ -322,13 +409,7 @@ const DatasetFiltersPanel = () => {
           >
             {allowedKinds.map((kind) => (
               <MenuItem key={kind} value={kind}>
-                {kind === 'range'
-                  ? 'Range'
-                  : kind === 'equals'
-                    ? 'Equals'
-                    : kind === 'contains'
-                      ? 'Contains'
-                      : 'Date range'}
+                {kindLabelMap[kind]}
               </MenuItem>
             ))}
           </Select>
@@ -439,6 +520,61 @@ const DatasetFiltersPanel = () => {
                 setFormState((prev) => ({ ...prev, dateEnd: event.target.value }))
               }
             />
+          </Stack>
+        ) : null}
+
+        {formState.kind === 'oneOf' ? (
+          <Stack spacing={1.5}>
+            <Typography variant="body2" color="text.secondary">
+              Select values to include in the filter.
+            </Typography>
+            <Stack spacing={0.5} sx={{ maxHeight: 180, overflowY: 'auto', paddingRight: 1 }}>
+              {(valueOptionsByColumn.get(formState.columnId) ?? []).map((option) => (
+                <FormControlLabel
+                  key={option.key}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={formState.selectedKeys.includes(option.key)}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setFormState((prev) => {
+                          const selectedKeys = checked
+                            ? [...prev.selectedKeys, option.key]
+                            : prev.selectedKeys.filter((key) => key !== option.key);
+                          return { ...prev, selectedKeys };
+                        });
+                      }}
+                    />
+                  }
+                  label={option.label}
+                />
+              ))}
+              {(valueOptionsByColumn.get(formState.columnId) ?? []).length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No values detected for this column in the preview.
+                </Typography>
+              ) : null}
+            </Stack>
+            <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                onClick={() => {
+                  const options = valueOptionsByColumn.get(formState.columnId) ?? [];
+                  setFormState((prev) => ({ ...prev, selectedKeys: options.map((option) => option.key) }));
+                }}
+                disabled={(valueOptionsByColumn.get(formState.columnId) ?? []).length === 0}
+              >
+                Select all
+              </Button>
+              <Button
+                size="small"
+                onClick={() => setFormState((prev) => ({ ...prev, selectedKeys: [] }))}
+                disabled={!formState.selectedKeys.length}
+              >
+                Clear
+              </Button>
+            </Stack>
           </Stack>
         ) : null}
 
