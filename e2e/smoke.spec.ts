@@ -63,6 +63,17 @@ test.describe('smoke guard rails', () => {
     await page.getByRole('option', { name: 'String' }).click();
     await expect(typeSelector).toContainText('String');
 
+    await page.getByTestId('filter-add-button').click();
+    await page.getByLabel('Filter type').click();
+    await page.getByRole('option', { name: 'Equals' }).click();
+    await page.getByRole('textbox', { name: /^Value$/ }).fill('Nimbus');
+    await page.getByTestId('filter-submit-button').click();
+
+    await expect(page.getByTestId('data-preview-table')).toContainText('Nimbus');
+    await expect(page.getByTestId('data-preview-table')).not.toContainText('Aurora');
+    await page.getByTestId('filter-clear-button').click();
+    await expect(page.getByTestId('data-preview-table')).toContainText('Aurora');
+
     await page.route('**/sample-url.csv', async (route) => {
       const csv = 'team,hours\nOrion,20\nHelios,18';
       await route.fulfill({

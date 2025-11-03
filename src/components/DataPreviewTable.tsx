@@ -2,6 +2,8 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
+  Button,
   Collapse,
   IconButton,
   MenuItem,
@@ -22,6 +24,9 @@ import { sanitizeColumnType, validateColumnType, type ColumnType } from '@/lib/t
 const DataPreviewTable = () => {
   const [validationState, setValidationState] = useState<Record<string, string | null>>({});
   const preview = useImportStore((state) => state.preview);
+  const filters = useImportStore((state) => state.filters);
+  const clearFilters = useImportStore((state) => state.clearFilters);
+  const lastFilterDurationMs = useImportStore((state) => state.lastFilterDurationMs);
   const overrideColumnType = useImportStore((state) => state.overrideColumnType);
   const renameColumn = useImportStore((state) => state.renameColumn);
   const setColumnLabel = useImportStore((state) => state.setColumnLabel);
@@ -29,7 +34,14 @@ const DataPreviewTable = () => {
   const dispatch = useAppStore((state) => state.dispatch);
 
   const columns = useMemo(() => preview?.columns ?? [], [preview?.columns]);
-  const rows = useMemo(() => preview?.rows ?? [], [preview?.rows]);
+  const rows = useMemo(() => {
+    if (!preview) {
+      return [] as Array<Record<string, unknown>>;
+    }
+    return preview.filteredRows ?? preview.rows;
+  }, [preview?.filteredRows, preview?.rows]);
+  const totalRowCount = preview?.rows.length ?? 0;
+  const filteredRowCount = preview?.filteredRowCount ?? rows.length;
   const truncated = preview?.truncated ?? false;
   const datasetId = preview?.datasetId ?? null;
   const [renameDrafts, setRenameDrafts] = useState<Record<string, string>>({});
@@ -216,10 +228,26 @@ const DataPreviewTable = () => {
       <Stack spacing={1} sx={{ marginBottom: 2 }}>
         <Typography variant="h6">Data Preview</Typography>
         <Typography variant="body2" color="text.secondary">
-          Showing {rows.length.toLocaleString()} rows{truncated ? ' (preview limited to first 1,000 rows)' : ''}.
-          Scroll horizontally to view additional columns.
+          {filters.length
+            ? `Showing ${filteredRowCount.toLocaleString()} of ${totalRowCount.toLocaleString()} rows${truncated ? ' (preview limited to first 1,000 rows)' : ''}.`
+            : `Showing ${rows.length.toLocaleString()} rows${truncated ? ' (preview limited to first 1,000 rows)' : ''}.`}
+          {' '}Scroll horizontally to view additional columns.
+          {lastFilterDurationMs && filters.length ? ` Filtered in ${lastFilterDurationMs.toFixed(1)}ms.` : ''}
         </Typography>
       </Stack>
+      {filters.length > 0 && filteredRowCount === 0 ? (
+        <Alert
+          severity="warning"
+          sx={{ marginBottom: 2 }}
+          action={
+            <Button color="warning" size="small" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          }
+        >
+          No data matches the current filters.
+        </Alert>
+      ) : null}
       <div className="data-preview-table__container">
         <table className="data-preview-table">
           <thead>

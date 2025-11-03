@@ -9,6 +9,7 @@ import HistoryControls from '@/components/HistoryControls';
 import ThemeToggle from '@/components/ThemeToggle';
 import AppThemeProvider from '@/components/AppThemeProvider';
 import DataImportPanel from '@/components/DataImportPanel';
+import DatasetFiltersPanel from '@/components/DatasetFiltersPanel';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -59,6 +60,7 @@ const RootLayout = ({ children }: RootLayoutProps) => (
             </header>
           <aside aria-label="Field list" className="app-shell__sidebar">
               <DataImportPanel />
+              <DatasetFiltersPanel />
           </aside>
             <main className="app-shell__main">{children}</main>
             <aside aria-label="Inspector" className="app-shell__inspector">

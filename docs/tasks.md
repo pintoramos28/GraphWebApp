@@ -26,7 +26,7 @@ Each task has a checkbox (`[ ]`) and **Refs** linking to the plan item(s) in `do
 10. [x] URL import with CORS handling + progress UI. **Refs:** P11; R3, R35  
 11. [x] Clipboard paste parser with header detection. **Refs:** P11; R3  
 12. [x] Field metadata editor (rename, labels, units) with propagation to views. **Refs:** P12; R4  
-13. [ ] Visual filter chips (range, equals, contains, date bounds) with performance budget. **Refs:** P13; R5  
+13. [x] Visual filter chips (range, equals, contains, date bounds) with performance budget. **Refs:** P13; R5  
 14. [ ] Expression editor (syntax check, preview, error counts). **Refs:** P14; R6  
 15. [ ] Group-by/aggregate UI (sum, mean, median, count, min, max, std). **Refs:** P15; R7  
 16. [ ] Pivot/unpivot helpers with before/after preview and revert. **Refs:** P15; R7  

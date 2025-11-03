@@ -93,4 +93,16 @@ describe('importStore columns', () => {
     expect(recent[0]).toEqual('https://example.com/a.csv');
     expect(recent[1]).toEqual('https://example.com/b.csv');
   });
+
+  it('filters datasets via equals filter', () => {
+    useImportStore.getState().setPreview(createPreview({}));
+    useImportStore.getState().addFilter({ columnId: 'team', kind: 'equals', value: 'Nimbus' });
+
+    const state = useImportStore.getState();
+    expect(state.filteredRowCount).toEqual(1);
+    expect(state.filteredRows[0]?.team).toEqual('Nimbus');
+
+    useImportStore.getState().clearFilters();
+    expect(useImportStore.getState().filteredRowCount).toEqual(2);
+  });
 });
