@@ -117,4 +117,18 @@ describe('importStore columns', () => {
     useImportStore.getState().clearFilters();
     expect(useImportStore.getState().filteredRowCount).toEqual(2);
   });
+
+  it('adds derived columns via expressions', () => {
+    useImportStore.getState().setPreview(createPreview({}));
+    useImportStore.getState().addDerivedColumn('HoursSquared', 'hours * hours');
+
+    const state = useImportStore.getState();
+    const derivedColumn = state.preview?.columns.find((column) => column.name === 'HoursSquared');
+    expect(derivedColumn).toBeDefined();
+    expect(state.preview?.rows[0]?.[derivedColumn!.fieldId]).toEqual(100);
+    expect(state.derivedColumns[0]?.sampleValues[0]).toEqual(100);
+
+    useImportStore.getState().removeDerivedColumn(state.derivedColumns[0]!.id);
+    expect(useImportStore.getState().preview?.columns.find((column) => column.name === 'HoursSquared')).toBeUndefined();
+  });
 });

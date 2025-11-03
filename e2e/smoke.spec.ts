@@ -73,6 +73,13 @@ test.describe('smoke guard rails', () => {
     await page.getByTestId('filter-clear-button').click();
     await expect(page.getByTestId('data-preview-table')).toContainText('Aurora');
 
+    await page.getByRole('button', { name: 'Add expression' }).click();
+    await page.getByLabel('Column name').fill('HoursSquared');
+    await page.getByRole('textbox', { name: /^Expression$/ }).fill('hours * hours');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText('hours * hours')).toBeVisible();
+    await page.keyboard.press('Escape');
+
     await page.route('**/sample-url.csv', async (route) => {
       const csv = 'team,hours\nOrion,20\nHelios,18';
       await route.fulfill({

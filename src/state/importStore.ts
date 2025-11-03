@@ -8,6 +8,8 @@ import {
   type DatasetFilterId,
   type NewDatasetFilter
 } from '@/lib/datasetFilters';
+import { Parser, type Value } from 'expr-eval';
+import { inferValueType } from '@/lib/csvUtils';
 
 export type PreviewColumn = {
   fieldId: string;
@@ -32,6 +34,16 @@ export type DatasetPreview = {
   filteredRowCount: number;
 };
 
+export type DerivedColumn = {
+  id: string;
+  fieldId: string;
+  name: string;
+  expression: string;
+  lastEvaluatedAt: number;
+  sampleValues: unknown[];
+  errorCount: number;
+};
+
 export type DatasetPreviewInput = {
   datasetId: string;
   fileName: string;
@@ -49,6 +61,7 @@ type ImportStoreState = {
   currentFile: string | null;
   preview: DatasetPreview | null;
   filters: DatasetFilter[];
+  derivedColumns: DerivedColumn[];
   filteredRows: Array<Record<string, unknown>>;
   filteredRowCount: number;
   lastFilterDurationMs: number | null;
@@ -65,6 +78,8 @@ type ImportStoreState = {
   updateFilter: (filterId: DatasetFilterId, updates: Partial<DatasetFilter>) => void;
   removeFilter: (filterId: DatasetFilterId) => void;
   clearFilters: () => void;
+  addDerivedColumn: (name: string, expression: string) => void;
+  removeDerivedColumn: (columnId: string) => void;
   addRecentUrl: (url: string) => void;
   reset: () => void;
 };
@@ -103,12 +118,98 @@ const generateFilterId = (): DatasetFilterId => {
   return uuid;
 };
 
+const generateDerivedId = () =>
+  typeof globalThis.crypto !== 'undefined' && 'randomUUID' in globalThis.crypto
+    ? globalThis.crypto.randomUUID()
+    : `derived-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const sanitizeVariableName = (input: string, used: Set<string>) => {
+  const base = input
+    .trim()
+    .replace(/[^a-zA-Z0-9_]/g, '_')
+    .replace(/_{2,}/g, '_')
+    .replace(/^\d+/, '');
+  let name = base.length ? base : 'field';
+  let suffix = 1;
+  while (used.has(name)) {
+    name = `${base || 'field'}_${suffix++}`;
+  }
+  used.add(name);
+  return name;
+};
+
+export const buildVariableNameMap = (columns: PreviewColumn[]) => {
+  const used = new Set<string>();
+  return columns.map((column) => {
+    const variable = sanitizeVariableName(column.name, used);
+    return {
+      fieldId: column.fieldId,
+      variable,
+      name: column.name
+    };
+  });
+};
+
+type CompiledExpressionResult = {
+  values: unknown[];
+  errors: number;
+  type: string;
+  sampleValues: unknown[];
+};
+
+const evaluateExpression = (
+  rows: Array<Record<string, unknown>>,
+  columns: PreviewColumn[],
+  expression: string
+): CompiledExpressionResult => {
+  const parser = new Parser({ allowMemberAccess: false });
+  const compiled = parser.parse(expression);
+  const variableEntries = buildVariableNameMap(columns);
+  const variableMap = new Map(variableEntries.map((entry) => [entry.variable, entry.fieldId]));
+
+  const missingVariables = compiled
+    .variables()
+    .filter((variable) => !variableMap.has(variable) && variable !== 'PI' && variable !== 'E');
+
+  if (missingVariables.length) {
+    throw new Error(`Unknown variables: ${missingVariables.join(', ')}`);
+  }
+
+  const values: unknown[] = [];
+  let errorCount = 0;
+
+  for (const row of rows) {
+    const scope: Record<string, Value> = {};
+    variableMap.forEach((fieldId, variable) => {
+      scope[variable] = row[fieldId] as Value;
+    });
+    try {
+      const result = compiled.evaluate(scope);
+      values.push(result);
+    } catch (error) {
+      errorCount += 1;
+      values.push(null);
+    }
+  }
+
+  const sample = values.find((value) => value !== null && value !== undefined);
+  const type = inferValueType(sample ?? null);
+
+  return {
+    values,
+    errors: errorCount,
+    type,
+    sampleValues: values.slice(0, 5)
+  };
+};
+
 export const useImportStore = create<ImportStoreState>((set) => ({
   phase: 'idle',
   message: null,
   currentFile: null,
   preview: null,
   filters: [],
+  derivedColumns: [],
   filteredRows: [],
   filteredRowCount: 0,
   lastFilterDurationMs: null,
@@ -120,6 +221,7 @@ export const useImportStore = create<ImportStoreState>((set) => ({
       currentFile: fileName,
       preview: null,
       filters: [],
+      derivedColumns: [],
       filteredRows: [],
       filteredRowCount: 0,
       lastFilterDurationMs: null
@@ -192,6 +294,7 @@ export const useImportStore = create<ImportStoreState>((set) => ({
           filteredRowCount: filteredPreview.filteredRowCount
         },
         filters: validFilters,
+        derivedColumns: [],
         filteredRows: filteredPreview.filteredRows,
         filteredRowCount: filteredPreview.filteredRowCount,
         lastFilterDurationMs: filteredPreview.durationMs
@@ -464,6 +567,7 @@ export const useImportStore = create<ImportStoreState>((set) => ({
       return {
         ...state,
         filters: [],
+        derivedColumns: state.derivedColumns,
         preview: {
           ...state.preview,
           filteredRows: state.preview.rows,
@@ -473,6 +577,128 @@ export const useImportStore = create<ImportStoreState>((set) => ({
         filteredRowCount: state.preview.rows.length,
         lastFilterDurationMs: null,
         message: null
+      };
+    }),
+  addDerivedColumn: (name, expression) =>
+    set((state) => {
+      if (!state.preview) {
+        throw new Error('Load a dataset before adding expressions.');
+      }
+      const trimmedName = name.trim();
+      if (!trimmedName.length) {
+        throw new Error('Expression name cannot be empty.');
+      }
+      const evaluation = evaluateExpression(state.preview.rows, state.preview.columns, expression);
+
+      const fieldIdBase = trimmedName
+        .trim()
+        .replace(/[^a-zA-Z0-9_]/g, '_')
+        .replace(/_{2,}/g, '_')
+        .replace(/^\d+/, 'col_')
+        .toLowerCase();
+      let fieldId = fieldIdBase || `derived_${state.derivedColumns.length + 1}`;
+      const existingFieldIds = new Set(state.preview.columns.map((column) => column.fieldId));
+      let suffix = 1;
+      while (existingFieldIds.has(fieldId)) {
+        fieldId = `${fieldIdBase}_${suffix++}`;
+      }
+
+      const newRows = state.preview.rows.map((row, index) => ({
+        ...row,
+        [fieldId]: evaluation.values[index]
+      }));
+
+      const newColumn: PreviewColumn = {
+        fieldId,
+        name: trimmedName,
+        originalName: trimmedName,
+        type: evaluation.type,
+        originalType: evaluation.type,
+        label: trimmedName,
+        unit: '',
+        hasLabelOverride: false,
+        hasUnitOverride: false
+      };
+
+      const derivedColumn: DerivedColumn = {
+        id: generateDerivedId(),
+        fieldId,
+        name: trimmedName,
+        expression,
+        lastEvaluatedAt: Date.now(),
+        sampleValues: evaluation.sampleValues,
+        errorCount: evaluation.errors
+      };
+
+      const previewWithDerived: PreviewForComputation = {
+        datasetId: state.preview.datasetId,
+        fileName: state.preview.fileName,
+        rowCount: state.preview.rowCount,
+        truncated: state.preview.truncated,
+        columns: [...state.preview.columns, newColumn],
+        rows: newRows
+      };
+
+      const filteredPreview = computeFilteredPreview(previewWithDerived, state.filters);
+
+      return {
+        ...state,
+        derivedColumns: [...state.derivedColumns, derivedColumn],
+        preview: {
+          ...state.preview,
+          rows: newRows,
+          columns: [...state.preview.columns, newColumn],
+          filteredRows: filteredPreview.filteredRows,
+          filteredRowCount: filteredPreview.filteredRowCount
+        },
+        filteredRows: filteredPreview.filteredRows,
+        filteredRowCount: filteredPreview.filteredRowCount,
+        lastFilterDurationMs: filteredPreview.durationMs,
+        message:
+          evaluation.errors > 0
+            ? `${evaluation.errors} rows could not be evaluated; values defaulted to null.`
+            : state.message
+      };
+    }),
+  removeDerivedColumn: (columnId) =>
+    set((state) => {
+      if (!state.preview) {
+        return state;
+      }
+      const derivedColumn = state.derivedColumns.find((column) => column.id === columnId);
+      if (!derivedColumn) {
+        return state;
+      }
+      const { fieldId } = derivedColumn;
+      const columns = state.preview.columns.filter((column) => column.fieldId !== fieldId);
+      const rows = state.preview.rows.map((row) => {
+        const { [fieldId]: _, ...rest } = row;
+        return rest;
+      });
+      const filteredPreview = computeFilteredPreview(
+        {
+          datasetId: state.preview.datasetId,
+          fileName: state.preview.fileName,
+          rowCount: state.preview.rowCount,
+          truncated: state.preview.truncated,
+          columns,
+          rows
+        },
+        state.filters
+      );
+      return {
+        ...state,
+        derivedColumns: state.derivedColumns.filter((column) => column.id !== columnId),
+        preview: {
+          ...state.preview,
+          columns,
+          rows,
+          filteredRows: filteredPreview.filteredRows,
+          filteredRowCount: filteredPreview.filteredRowCount
+        },
+        filteredRows: filteredPreview.filteredRows,
+        filteredRowCount: filteredPreview.filteredRowCount,
+        lastFilterDurationMs: filteredPreview.durationMs
       };
     }),
   addRecentUrl: (url) =>
@@ -490,6 +716,7 @@ export const useImportStore = create<ImportStoreState>((set) => ({
       currentFile: null,
       preview: null,
       filters: [],
+      derivedColumns: [],
       filteredRows: [],
       filteredRowCount: 0,
       lastFilterDurationMs: null
