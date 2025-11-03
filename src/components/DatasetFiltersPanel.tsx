@@ -499,8 +499,8 @@ const DatasetFiltersPanel = () => {
         {formState.kind === 'dateRange' ? (
           <Stack direction="row" spacing={2}>
             <TextField
-              label="Start date"
-              type="date"
+              label="Start"
+              type="datetime-local"
               size="small"
               fullWidth
               InputLabelProps={{ shrink: true }}
@@ -510,8 +510,8 @@ const DatasetFiltersPanel = () => {
               }
             />
             <TextField
-              label="End date"
-              type="date"
+              label="End"
+              type="datetime-local"
               size="small"
               fullWidth
               InputLabelProps={{ shrink: true }}
