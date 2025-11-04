@@ -134,14 +134,18 @@ const applyAction = (state: AppPresentState, action: AppAction): AppPresentState
       if (state.shelves[action.shelf] === action.fieldId) {
         return state;
       }
+      const nextShelves: ShelfAssignments = { ...state.shelves };
+      (Object.keys(nextShelves) as ShelfKey[]).forEach((key) => {
+        if (nextShelves[key] === action.fieldId) {
+          delete nextShelves[key];
+        }
+      });
+      nextShelves[action.shelf] = action.fieldId;
       return {
         ...state,
         version: state.version + 1,
         lastUpdated: Date.now(),
-        shelves: {
-          ...state.shelves,
-          [action.shelf]: action.fieldId
-        }
+        shelves: nextShelves
       };
     }
     case 'shelf/clear': {

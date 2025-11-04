@@ -144,4 +144,11 @@ describe('importStore columns', () => {
     expect(derivedColumn?.name).toEqual('HoursCubed');
     expect(state.preview?.rows[0]?.[derivedColumn!.fieldId]).toEqual(1000);
   });
+
+  it('prevents duplicate derived column names', async () => {
+    useImportStore.getState().setPreview(createPreview({}));
+    await expect(
+      useImportStore.getState().addDerivedColumn('team', 'hours * 2')
+    ).rejects.toThrow('A column named "team" already exists.');
+  });
 });

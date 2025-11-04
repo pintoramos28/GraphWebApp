@@ -33,13 +33,14 @@ const DataPreviewTable = () => {
   const setColumnUnit = useImportStore((state) => state.setColumnUnit);
   const dispatch = useAppStore((state) => state.dispatch);
 
-  const columns = useMemo(() => preview?.columns ?? [], [preview?.columns]);
+  const previewColumns = preview?.columns;
+  const columns = useMemo(() => previewColumns ?? [], [previewColumns]);
   const rows = useMemo(() => {
     if (!preview) {
       return [] as Array<Record<string, unknown>>;
     }
     return preview.filteredRows ?? preview.rows;
-  }, [preview?.filteredRows, preview?.rows]);
+  }, [preview]);
   const totalRowCount = preview?.rows.length ?? 0;
   const filteredRowCount = preview?.filteredRowCount ?? rows.length;
   const truncated = preview?.truncated ?? false;

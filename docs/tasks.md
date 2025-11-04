@@ -38,8 +38,8 @@ Each task has a checkbox (`[ ]`) and **Refs** linking to the plan item(s) in `do
 ## Phase 2 — Visualization Core (Scatter/Line/Bar)
 
 19. [x] Integrate `vega-embed` wrapper component with spec versioning. **Refs:** P20; R45, R43  
-20. [ ] Build drag-and-drop shelves for X, Y, Color, Size, Shape, Opacity, Row, Column. **Refs:** P21; R17  
-21. [ ] Implement type guards and drop validation with user feedback. **Refs:** P21; R17, R18  
+20. [x] Build drag-and-drop shelves for X, Y, Color, Size, Shape, Opacity, Row, Column. **Refs:** P21; R17  
+21. [x] Implement type guards and drop validation with user feedback. **Refs:** P21; R17, R18  
 22. [ ] Scatter (base): render marks, handle nulls, axes. **Refs:** P22; R10  
 23. [ ] Scatter customization: color/size/shape mappings + legends. **Refs:** P22, P25; R11, R19  
 24. [ ] Scatter jitter control with reproducible seed. **Refs:** P22; R11  

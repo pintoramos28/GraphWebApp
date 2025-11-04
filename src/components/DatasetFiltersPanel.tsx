@@ -135,7 +135,7 @@ const DatasetFiltersPanel = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const columns = preview?.columns ?? [];
+  const columns = useMemo(() => preview?.columns ?? [], [preview]);
   const columnsById = useMemo(
     () => new Map(columns.map((column) => [column.fieldId, column])),
     [columns]

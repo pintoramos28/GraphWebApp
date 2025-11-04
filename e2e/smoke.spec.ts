@@ -67,6 +67,7 @@ test.describe('smoke guard rails', () => {
     await page.getByRole('checkbox', { name: 'Aurora' }).uncheck();
     await page.getByRole('checkbox', { name: 'Zenith' }).uncheck();
     await page.getByTestId('filter-submit-button').click();
+    await page.waitForSelector('role=dialog[name*="filter"]', { state: 'hidden' });
 
     await expect(page.getByTestId('data-preview-table')).toContainText('Nimbus');
     await expect(page.getByTestId('data-preview-table')).not.toContainText('Aurora');
