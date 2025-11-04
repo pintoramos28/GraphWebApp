@@ -122,4 +122,22 @@ describe('appStore history', () => {
     expect(state.present.version).toBe(initialVersion + 1);
     expect(state.present.datasets['ds-1']?.fields.price?.label).toBe('Price (EUR)');
   });
+
+  it('updates scatter jitter settings with history support', () => {
+    resetStore();
+    const initial = useAppStore.getState().present.scatter.jitter;
+
+    useAppStore.getState().dispatch({
+      type: 'scatter/setJitter',
+      enabled: !initial.enabled,
+      magnitude: 0.6,
+      seed: 2025
+    });
+
+    const state = useAppStore.getState();
+    expect(state.present.scatter.jitter.enabled).toBe(!initial.enabled);
+    expect(state.present.scatter.jitter.magnitude).toBe(0.6);
+    expect(state.present.scatter.jitter.seed).toBe(2025);
+    expect(state.past).toHaveLength(1);
+  });
 });

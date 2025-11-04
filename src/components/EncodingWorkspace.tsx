@@ -11,7 +11,7 @@ import {
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core';
-import { selectShelves, useAppStore, type ShelfAssignments, type ShelfKey } from '@/state/appStore';
+import { selectShelves, selectScatterJitter, useAppStore, type ShelfAssignments, type ShelfKey } from '@/state/appStore';
 import { useImportStore } from '@/state/importStore';
 import type { EncodingDataset, EncodingField } from '@/lib/encodingTypes';
 import FieldListPanel, { FieldDragPreview } from './FieldListPanel';
@@ -55,6 +55,7 @@ const EncodingWorkspace = () => {
   const dataset = useMemo(() => resolveDataset(preview), [preview]);
   const dispatch = useAppStore((state) => state.dispatch);
   const shelves = useAppStore(selectShelves);
+  const jitter = useAppStore(selectScatterJitter);
   const [dropError, setDropError] = useState<string | null>(null);
   const [activeFieldId, setActiveFieldId] = useState<string | null>(null);
 
@@ -129,10 +130,14 @@ const EncodingWorkspace = () => {
     setDropError(null);
   }, []);
 
-  const spec = useMemo(() => buildEncodingSpec(dataset, shelves), [dataset, shelves]);
+  const spec = useMemo(
+    () => buildEncodingSpec(dataset, shelves, { jitter }),
+    [dataset, shelves, jitter]
+  );
   const sampleSpec = useMemo(
-    () => (preview ? null : buildEncodingSpec(SAMPLE_DATASET, SAMPLE_SHELF_ASSIGNMENTS)),
-    [preview]
+    () =>
+      preview ? null : buildEncodingSpec(SAMPLE_DATASET, SAMPLE_SHELF_ASSIGNMENTS, { jitter }),
+    [preview, jitter]
   );
   const specToRender = spec ?? sampleSpec;
   const activeField = activeFieldId ? dataset.fields.find((field) => field.fieldId === activeFieldId) ?? null : null;

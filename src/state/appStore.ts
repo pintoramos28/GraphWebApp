@@ -29,6 +29,13 @@ export type AppPresentState = {
   };
   shelves: ShelfAssignments;
   datasets: Record<string, DatasetReference>;
+  scatter: {
+    jitter: {
+      enabled: boolean;
+      magnitude: number;
+      seed: number;
+    };
+  };
 };
 
 export type AppAction =
@@ -43,6 +50,12 @@ export type AppAction =
       datasetId: string;
       fieldId: string;
       changes: Partial<FieldMetadata>;
+    }
+  | {
+      type: 'scatter/setJitter';
+      enabled?: boolean;
+      magnitude?: number;
+      seed?: number;
     };
 
 const HISTORY_LIMIT = 100;
@@ -68,7 +81,14 @@ const createInitialPresentState = (): AppPresentState => ({
     description: ''
   },
   shelves: {},
-  datasets: {}
+  datasets: {},
+  scatter: {
+    jitter: {
+      enabled: false,
+      magnitude: 0.4,
+      seed: 1337
+    }
+  }
 });
 
 const cloneState = (state: AppPresentState): AppPresentState => structuredClone(state);
@@ -265,6 +285,30 @@ const applyAction = (state: AppPresentState, action: AppAction): AppPresentState
         }
       };
     }
+    case 'scatter/setJitter': {
+      const { jitter } = state.scatter;
+      const nextJitter = {
+        enabled: action.enabled ?? jitter.enabled,
+        magnitude: action.magnitude ?? jitter.magnitude,
+        seed: action.seed ?? jitter.seed
+      };
+      if (
+        nextJitter.enabled === jitter.enabled &&
+        nextJitter.magnitude === jitter.magnitude &&
+        nextJitter.seed === jitter.seed
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        version: state.version + 1,
+        lastUpdated: Date.now(),
+        scatter: {
+          ...state.scatter,
+          jitter: nextJitter
+        }
+      };
+    }
     default: {
       const exhaustiveCheck: never = action;
       throw new Error('Unhandled action in appStore reducer');
@@ -346,3 +390,4 @@ export const selectCanUndo = (store: AppStoreState) => store.canUndo;
 export const selectCanRedo = (store: AppStoreState) => store.canRedo;
 export const selectProjectMeta = (store: AppStoreState) => store.present.project;
 export const selectShelves = (store: AppStoreState) => store.present.shelves;
+export const selectScatterJitter = (store: AppStoreState) => store.present.scatter.jitter;

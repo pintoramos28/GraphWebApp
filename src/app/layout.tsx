@@ -11,6 +11,7 @@ import AppThemeProvider from '@/components/AppThemeProvider';
 import DataImportPanel from '@/components/DataImportPanel';
 import DatasetFiltersPanel from '@/components/DatasetFiltersPanel';
 import ExpressionEditorPanel from '@/components/ExpressionEditorPanel';
+import ScatterControlsPanel from '@/components/ScatterControlsPanel';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -65,7 +66,10 @@ const RootLayout = ({ children }: RootLayoutProps) => (
           </aside>
             <main className="app-shell__main">{children}</main>
             <aside aria-label="Inspector" className="app-shell__inspector">
-              <ExpressionEditorPanel />
+              <Stack spacing={2}>
+                <ScatterControlsPanel />
+                <ExpressionEditorPanel />
+              </Stack>
             </aside>
           </div>
         </AppThemeProvider>
