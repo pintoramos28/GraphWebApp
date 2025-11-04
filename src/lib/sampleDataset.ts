@@ -8,25 +8,29 @@ export const SAMPLE_DATASET: EncodingDataset = {
       fieldId: 'sprint',
       name: 'sprint',
       label: 'Sprint',
-      type: 'string'
+      type: 'string',
+      semanticType: 'categorical'
     },
     {
       fieldId: 'team',
       name: 'team',
       label: 'Team',
-      type: 'string'
+      type: 'string',
+      semanticType: 'categorical'
     },
     {
       fieldId: 'defects',
       name: 'defects',
       label: 'Defects Found',
-      type: 'number'
+      type: 'number',
+      semanticType: 'continuous'
     },
     {
       fieldId: 'hours',
       name: 'hours',
       label: 'Engineering Hours',
       type: 'number',
+      semanticType: 'continuous',
       unit: 'hours'
     }
   ],

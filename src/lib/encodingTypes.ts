@@ -1,8 +1,11 @@
+import type { SemanticType } from './semanticTypes';
+
 export type EncodingField = {
   fieldId: string;
   name: string;
   label: string;
   type: string;
+  semanticType: SemanticType;
   unit?: string;
 };
 

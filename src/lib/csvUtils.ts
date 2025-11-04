@@ -18,11 +18,14 @@ export const inferValueType = (value: unknown): string => {
   return 'string';
 };
 
+import { inferSemanticType, type SemanticType } from './semanticTypes';
+
 export type SampleColumn = {
   fieldId: string;
   name: string;
   originalName: string;
   type: string;
+  semanticType: SemanticType;
 };
 
 export const buildColumnsFromFields = (
@@ -31,11 +34,13 @@ export const buildColumnsFromFields = (
 ) => {
   return fields.map((field) => {
     const sampleValue = sampleRows.find((row) => field in row)?.[field];
+    const inferredType = inferValueType(sampleValue);
     return {
       fieldId: field,
       name: field,
       originalName: field,
-      type: inferValueType(sampleValue)
+      type: inferredType,
+      semanticType: inferSemanticType(inferredType)
     };
   });
 };

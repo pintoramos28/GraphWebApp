@@ -233,6 +233,13 @@ a {
   margin-top: 0.5rem;
 }
 
+.encoding-field-list__scroll {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  margin-top: 0.5rem;
+}
+
 .encoding-field-list__item {
   display: flex;
   align-items: center;
@@ -246,6 +253,12 @@ a {
 
 .encoding-field-list__item:active {
   cursor: grabbing;
+}
+
+.encoding-field-list__item--overlay {
+  background: #ffffff;
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25);
 }
 
 .encoding-shelves {

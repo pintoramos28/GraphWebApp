@@ -1,10 +1,23 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { createDefaultLabel } from '@/lib/fieldMetadata';
+import type { SampleColumn } from '@/lib/csvUtils';
 import { useImportStore, type DatasetPreviewInput } from '@/state/importStore';
 
-const defaultColumns = () => [
-  { fieldId: 'team', name: 'team', originalName: 'team', type: 'string' },
-  { fieldId: 'hours', name: 'hours', originalName: 'hours', type: 'number' }
+const defaultColumns = (): SampleColumn[] => [
+  {
+    fieldId: 'team',
+    name: 'team',
+    originalName: 'team',
+    type: 'string',
+    semanticType: 'categorical'
+  },
+  {
+    fieldId: 'hours',
+    name: 'hours',
+    originalName: 'hours',
+    type: 'number',
+    semanticType: 'continuous'
+  }
 ];
 
 const createPreview = (overrides: Partial<DatasetPreviewInput>): DatasetPreviewInput => ({
@@ -126,6 +139,7 @@ describe('importStore columns', () => {
     const derivedColumn = state.preview?.columns.find((column) => column.name === 'HoursSquared');
     expect(derivedColumn).toBeDefined();
     expect(state.preview?.rows[0]?.[derivedColumn!.fieldId]).toEqual(100);
+    expect(derivedColumn?.semanticType).toEqual('continuous');
     expect(state.derivedColumns[0]?.sampleValues[0]).toEqual(100);
 
     useImportStore.getState().removeDerivedColumn(state.derivedColumns[0]!.id);
@@ -143,6 +157,7 @@ describe('importStore columns', () => {
     const derivedColumn = state.preview?.columns.find((column) => column.fieldId === state.derivedColumns[0]!.fieldId);
     expect(derivedColumn?.name).toEqual('HoursCubed');
     expect(state.preview?.rows[0]?.[derivedColumn!.fieldId]).toEqual(1000);
+    expect(derivedColumn?.semanticType).toEqual('continuous');
   });
 
   it('prevents duplicate derived column names', async () => {
@@ -150,5 +165,20 @@ describe('importStore columns', () => {
     await expect(
       useImportStore.getState().addDerivedColumn('team', 'hours * 2')
     ).rejects.toThrow('A column named "team" already exists.');
+  });
+
+  it('allows overriding semantic type when compatible', () => {
+    useImportStore.getState().setPreview(createPreview({}));
+    useImportStore.getState().setColumnSemanticType('hours', 'categorical');
+    const column = useImportStore.getState().preview?.columns.find((item) => item.fieldId === 'hours');
+    expect(column?.semanticType).toBe('categorical');
+    expect(column?.hasSemanticOverride).toBe(true);
+  });
+
+  it('rejects incompatible semantic type selections', () => {
+    useImportStore.getState().setPreview(createPreview({}));
+    expect(() =>
+      useImportStore.getState().setColumnSemanticType('team', 'continuous')
+    ).toThrow('Field type "continuous" is not allowed for team.');
   });
 });

@@ -5,6 +5,9 @@ import {
   Alert,
   Button,
   Collapse,
+  FormControl,
+  FormHelperText,
+  InputLabel,
   IconButton,
   MenuItem,
   Paper,
@@ -20,6 +23,11 @@ import { createDefaultLabel } from '@/lib/fieldMetadata';
 import { useImportStore } from '@/state/importStore';
 import { useAppStore } from '@/state/appStore';
 import { sanitizeColumnType, validateColumnType, type ColumnType } from '@/lib/typeValidation';
+import {
+  getAllowedSemanticTypes,
+  SEMANTIC_TYPE_LABELS,
+  type SemanticType
+} from '@/lib/semanticTypes';
 
 const DataPreviewTable = () => {
   const [validationState, setValidationState] = useState<Record<string, string | null>>({});
@@ -31,6 +39,7 @@ const DataPreviewTable = () => {
   const renameColumn = useImportStore((state) => state.renameColumn);
   const setColumnLabel = useImportStore((state) => state.setColumnLabel);
   const setColumnUnit = useImportStore((state) => state.setColumnUnit);
+  const setColumnSemanticType = useImportStore((state) => state.setColumnSemanticType);
   const dispatch = useAppStore((state) => state.dispatch);
 
   const previewColumns = preview?.columns;
@@ -49,6 +58,7 @@ const DataPreviewTable = () => {
   const [labelDrafts, setLabelDrafts] = useState<Record<string, string>>({});
   const [unitDrafts, setUnitDrafts] = useState<Record<string, string>>({});
   const [renameErrors, setRenameErrors] = useState<Record<string, string | null>>({});
+  const [semanticErrors, setSemanticErrors] = useState<Record<string, string | null>>({});
   const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
 
   const handleTypeChange = useCallback(
@@ -59,6 +69,17 @@ const DataPreviewTable = () => {
       if (valid) {
         overrideColumnType(fieldId, requestedType);
         setValidationState((current) => ({ ...current, [fieldId]: null }));
+        const updatedColumn = useImportStore.getState().preview?.columns.find((column) => column.fieldId === fieldId);
+        if (datasetId && updatedColumn) {
+          dispatch({
+            type: 'datasets/updateField',
+            datasetId,
+            fieldId,
+            changes: {
+              semanticType: updatedColumn.semanticType
+            }
+          });
+        }
       } else {
         setExpandedFields((current) => ({ ...current, [fieldId]: true }));
         setValidationState((current) => ({
@@ -67,13 +88,36 @@ const DataPreviewTable = () => {
         }));
       }
     },
-    [overrideColumnType, rows]
+    [datasetId, dispatch, overrideColumnType, rows]
   );
 
   const allowedTypes = useMemo(() => {
     const baseTypes: ColumnType[] = ['string', 'number', 'boolean', 'datetime', 'object'];
     return baseTypes;
   }, []);
+
+  const handleSemanticTypeChange = useCallback(
+    (fieldId: string, semanticType: SemanticType) => {
+      try {
+        setColumnSemanticType(fieldId, semanticType);
+        setSemanticErrors((current) => ({ ...current, [fieldId]: null }));
+        if (datasetId) {
+          dispatch({
+            type: 'datasets/updateField',
+            datasetId,
+            fieldId,
+            changes: {
+              semanticType
+            }
+          });
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to update field type.';
+        setSemanticErrors((current) => ({ ...current, [fieldId]: message }));
+      }
+    },
+    [datasetId, dispatch, setColumnSemanticType]
+  );
 
   useEffect(() => {
     setRenameDrafts((current) =>
@@ -101,6 +145,7 @@ const DataPreviewTable = () => {
       }, {})
     );
     setRenameErrors({});
+    setSemanticErrors({});
     setExpandedFields((current) => {
       const next: Record<string, boolean> = {};
       columns.forEach((column) => {
@@ -310,6 +355,28 @@ const DataPreviewTable = () => {
                     </Stack>
                     <Collapse in={expandedFields[column.fieldId] ?? false} timeout="auto">
                       <Stack spacing={0.5} mt={0.5}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel id={`semantic-type-label-${column.fieldId}`}>
+                            Field type
+                          </InputLabel>
+                          <Select
+                            labelId={`semantic-type-label-${column.fieldId}`}
+                            label="Field type"
+                            value={column.semanticType}
+                            onChange={(event) =>
+                              handleSemanticTypeChange(column.fieldId, event.target.value as SemanticType)
+                            }
+                          >
+                            {getAllowedSemanticTypes(column.type).map((option) => (
+                              <MenuItem key={option} value={option}>
+                                {SEMANTIC_TYPE_LABELS[option]}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          {semanticErrors[column.fieldId] ? (
+                            <FormHelperText error>{semanticErrors[column.fieldId]}</FormHelperText>
+                          ) : null}
+                        </FormControl>
                         <TextField
                           label="Field name"
                           size="small"

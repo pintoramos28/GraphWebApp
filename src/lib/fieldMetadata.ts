@@ -1,10 +1,12 @@
 import type { SampleColumn } from './csvUtils';
+import type { SemanticType } from './semanticTypes';
 
 export type FieldMetadata = {
   fieldId: string;
   name: string;
   label: string;
   unit: string;
+  semanticType: SemanticType;
 };
 
 export const createDefaultLabel = (input: string): string => {
@@ -26,7 +28,8 @@ export const createFieldMetadataMap = (columns: SampleColumn[]): Record<string, 
       fieldId: column.fieldId,
       name: column.name,
       label,
-      unit: ''
+      unit: '',
+      semanticType: column.semanticType
     };
     return acc;
   }, {});

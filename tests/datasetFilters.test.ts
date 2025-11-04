@@ -9,9 +9,48 @@ import {
 import type { PreviewColumn } from '@/state/importStore';
 
 const columns: PreviewColumn[] = [
-  { fieldId: 'value', name: 'value', originalName: 'value', type: 'number', originalType: 'number', label: 'Value', unit: '', hasLabelOverride: false, hasUnitOverride: false },
-  { fieldId: 'category', name: 'category', originalName: 'category', type: 'string', originalType: 'string', label: 'Category', unit: '', hasLabelOverride: false, hasUnitOverride: false },
-  { fieldId: 'timestamp', name: 'timestamp', originalName: 'timestamp', type: 'datetime', originalType: 'datetime', label: 'Timestamp', unit: '', hasLabelOverride: false, hasUnitOverride: false }
+  {
+    fieldId: 'value',
+    name: 'value',
+    originalName: 'value',
+    type: 'number',
+    originalType: 'number',
+    semanticType: 'continuous',
+    defaultSemanticType: 'continuous',
+    hasSemanticOverride: false,
+    label: 'Value',
+    unit: '',
+    hasLabelOverride: false,
+    hasUnitOverride: false
+  },
+  {
+    fieldId: 'category',
+    name: 'category',
+    originalName: 'category',
+    type: 'string',
+    originalType: 'string',
+    semanticType: 'categorical',
+    defaultSemanticType: 'categorical',
+    hasSemanticOverride: false,
+    label: 'Category',
+    unit: '',
+    hasLabelOverride: false,
+    hasUnitOverride: false
+  },
+  {
+    fieldId: 'timestamp',
+    name: 'timestamp',
+    originalName: 'timestamp',
+    type: 'datetime',
+    originalType: 'datetime',
+    semanticType: 'temporal',
+    defaultSemanticType: 'temporal',
+    hasSemanticOverride: false,
+    label: 'Timestamp',
+    unit: '',
+    hasLabelOverride: false,
+    hasUnitOverride: false
+  }
 ];
 
 const rows = [

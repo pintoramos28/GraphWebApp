@@ -10,6 +10,12 @@ import {
 } from '@/lib/datasetFilters';
 import { Parser, type Value } from 'expr-eval';
 import { inferValueType } from '@/lib/csvUtils';
+import {
+  getAllowedSemanticTypes,
+  inferSemanticType,
+  isSemanticTypeAllowed,
+  type SemanticType
+} from '@/lib/semanticTypes';
 import { createWorker } from '@/workers/createWorker';
 
 export type PreviewColumn = {
@@ -18,6 +24,9 @@ export type PreviewColumn = {
   originalName: string;
   type: string;
   originalType: string;
+  semanticType: SemanticType;
+  defaultSemanticType: SemanticType;
+  hasSemanticOverride: boolean;
   label: string;
   unit: string;
   hasLabelOverride: boolean;
@@ -75,6 +84,7 @@ type ImportStoreState = {
   renameColumn: (fieldId: string, newName: string) => void;
   setColumnLabel: (fieldId: string, label: string) => void;
   setColumnUnit: (fieldId: string, unit: string) => void;
+  setColumnSemanticType: (fieldId: string, semanticType: SemanticType) => void;
   addFilter: (filter: NewDatasetFilter) => void;
   updateFilter: (filterId: DatasetFilterId, updates: Partial<DatasetFilter>) => void;
   removeFilter: (filterId: DatasetFilterId) => void;
@@ -247,6 +257,22 @@ export const useImportStore = create<ImportStoreState>((set, get) => ({
         const hasTypeOverride = previous ? previous.type !== previous.originalType : false;
         const nextName = previous?.name ?? column.name;
         const originalName = previous?.originalName ?? column.originalName ?? column.name;
+        const defaultSemanticType = inferSemanticType(autoType);
+        let semanticType = defaultSemanticType;
+        let hasSemanticOverride = false;
+        if (previous) {
+          const allowed = getAllowedSemanticTypes(autoType);
+          if (previous.hasSemanticOverride && allowed.includes(previous.semanticType)) {
+            semanticType = previous.semanticType;
+            hasSemanticOverride = true;
+          } else if (!previous.hasSemanticOverride && allowed.includes(previous.semanticType)) {
+            semanticType = previous.semanticType;
+            hasSemanticOverride = false;
+          } else if (!allowed.includes(previous.semanticType)) {
+            semanticType = defaultSemanticType;
+            hasSemanticOverride = false;
+          }
+        }
         const hasLabelOverride = previous?.hasLabelOverride ?? false;
         const hasUnitOverride = previous?.hasUnitOverride ?? false;
         const label = hasLabelOverride
@@ -260,6 +286,9 @@ export const useImportStore = create<ImportStoreState>((set, get) => ({
           originalName,
           type: hasTypeOverride ? previous!.type : autoType,
           originalType,
+          semanticType,
+          defaultSemanticType,
+          hasSemanticOverride,
           label,
           unit,
           hasLabelOverride,
@@ -313,14 +342,24 @@ export const useImportStore = create<ImportStoreState>((set, get) => ({
       if (!state.preview) {
         return state;
       }
-      const columns = state.preview.columns.map((column) =>
-        column.fieldId === fieldId
-          ? {
-              ...column,
-              type: newType
-            }
-          : column
-      );
+      const columns = state.preview.columns.map((column) => {
+        if (column.fieldId !== fieldId) {
+          return column;
+        }
+        const defaultSemanticType = inferSemanticType(newType);
+        const allowed = getAllowedSemanticTypes(newType);
+        const semanticType = column.hasSemanticOverride && allowed.includes(column.semanticType)
+          ? column.semanticType
+          : defaultSemanticType;
+        return {
+          ...column,
+          type: newType,
+          originalType: column.originalType,
+          defaultSemanticType,
+          semanticType,
+          hasSemanticOverride: semanticType !== defaultSemanticType
+        };
+      });
       const filteredPreview = computeFilteredPreview(
         {
           datasetId: state.preview.datasetId,
@@ -436,6 +475,35 @@ export const useImportStore = create<ImportStoreState>((set, get) => ({
                 }
               : column
           )
+        }
+      };
+    }),
+  setColumnSemanticType: (fieldId, semanticType) =>
+    set((state) => {
+      if (!state.preview) {
+        return state;
+      }
+      const column = state.preview.columns.find((item) => item.fieldId === fieldId);
+      if (!column) {
+        return state;
+      }
+      if (!isSemanticTypeAllowed(column.type, semanticType)) {
+        throw new Error(`Field type "${semanticType}" is not allowed for ${column.name}.`);
+      }
+      const nextColumns = state.preview.columns.map((item) =>
+        item.fieldId === fieldId
+          ? {
+              ...item,
+              semanticType,
+              hasSemanticOverride: semanticType !== item.defaultSemanticType
+            }
+          : item
+      );
+      return {
+        ...state,
+        preview: {
+          ...state.preview,
+          columns: nextColumns
         }
       };
     }),
@@ -613,12 +681,17 @@ export const useImportStore = create<ImportStoreState>((set, get) => ({
       [fieldId]: evaluation.values[index]
     }));
 
+    const defaultSemanticType = inferSemanticType(evaluation.type);
+
     const newColumn: PreviewColumn = {
       fieldId,
       name: trimmedName,
       originalName: trimmedName,
       type: evaluation.type,
       originalType: evaluation.type,
+       semanticType: defaultSemanticType,
+       defaultSemanticType,
+       hasSemanticOverride: false,
       label: trimmedName,
       unit: '',
       hasLabelOverride: false,
@@ -704,6 +777,8 @@ export const useImportStore = create<ImportStoreState>((set, get) => ({
       errorCount: evaluation.errors
     };
 
+    const defaultSemanticType = inferSemanticType(evaluation.type);
+
     const previewColumns = state.preview.columns.map((column) =>
       column.fieldId === fieldId
         ? {
@@ -711,7 +786,10 @@ export const useImportStore = create<ImportStoreState>((set, get) => ({
             name: trimmedName,
             label: trimmedName,
             type: evaluation.type,
-            originalType: evaluation.type
+            originalType: evaluation.type,
+            semanticType: defaultSemanticType,
+            defaultSemanticType,
+            hasSemanticOverride: false
           }
         : column
     );

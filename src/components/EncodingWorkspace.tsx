@@ -2,11 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Stack, Typography } from '@mui/material';
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent
+} from '@dnd-kit/core';
 import { selectShelves, useAppStore, type ShelfAssignments, type ShelfKey } from '@/state/appStore';
 import { useImportStore } from '@/state/importStore';
 import type { EncodingDataset, EncodingField } from '@/lib/encodingTypes';
-import FieldListPanel from './FieldListPanel';
+import FieldListPanel, { FieldDragPreview } from './FieldListPanel';
 import EncodingShelves from './EncodingShelves';
 import { SAMPLE_DATASET } from '@/lib/sampleDataset';
 import { buildEncodingSpec } from '@/charts/specBuilder';
@@ -30,6 +38,7 @@ const resolveDataset = (preview: ReturnType<typeof useImportStore.getState>['pre
     fieldId: column.fieldId,
     name: column.name,
     label: column.label,
+    semanticType: column.semanticType,
     unit: column.unit,
     type: column.type
   }));
@@ -47,6 +56,7 @@ const EncodingWorkspace = () => {
   const dispatch = useAppStore((state) => state.dispatch);
   const shelves = useAppStore(selectShelves);
   const [dropError, setDropError] = useState<string | null>(null);
+  const [activeFieldId, setActiveFieldId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -74,8 +84,20 @@ const EncodingWorkspace = () => {
     [dispatch]
   );
 
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const fieldId = event.active.data?.current?.fieldId ?? event.active.id;
+      setDropError(null);
+      if (typeof fieldId === 'string') {
+        setActiveFieldId(fieldId);
+      }
+    },
+    []
+  );
+
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      setActiveFieldId(null);
       const { active, over } = event;
       if (!over) {
         setDropError(null);
@@ -102,6 +124,10 @@ const EncodingWorkspace = () => {
     },
     [dispatch, fieldMap]
   );
+  const handleDragCancel = useCallback(() => {
+    setActiveFieldId(null);
+    setDropError(null);
+  }, []);
 
   const spec = useMemo(() => buildEncodingSpec(dataset, shelves), [dataset, shelves]);
   const sampleSpec = useMemo(
@@ -109,14 +135,18 @@ const EncodingWorkspace = () => {
     [preview]
   );
   const specToRender = spec ?? sampleSpec;
+  const activeField = activeFieldId ? dataset.fields.find((field) => field.fieldId === activeFieldId) ?? null : null;
 
   return (
     <div className="encoding-workspace">
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
         <div className="encoding-workspace__board">
           <FieldListPanel fields={dataset.fields} datasetName={dataset.name} />
           <EncodingShelves dataset={dataset} assignments={shelves} onClearShelf={handleClearShelf} dropError={dropError} />
         </div>
+        <DragOverlay dropAnimation={null}>
+          {activeField ? <FieldDragPreview field={activeField} /> : null}
+        </DragOverlay>
       </DndContext>
       {specToRender ? (
         <div className="chart-card__content" data-testid="sample-scatter">
@@ -129,7 +159,7 @@ const EncodingWorkspace = () => {
         <Stack spacing={1} className="chart-card__placeholder" data-testid="sample-scatter">
           <Typography variant="h6">Assign fields to X and Y to generate a chart.</Typography>
           <Typography variant="body2" color="text.secondary">
-            Drag a numeric field to the Y shelf and a numeric, temporal, or categorical field to the X shelf.
+            Drag a continuous field to the Y shelf and a continuous, temporal, or categorical field to the X shelf.
           </Typography>
           {Object.keys(shelves).length > 0 ? (
             <Alert severity="info">

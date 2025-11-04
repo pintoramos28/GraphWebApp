@@ -7,6 +7,7 @@ const buildField = (overrides: Partial<EncodingField>): EncodingField => ({
   name: 'hours',
   label: 'Hours',
   type: 'number',
+  semanticType: 'continuous',
   ...overrides
 });
 
@@ -17,7 +18,10 @@ describe('shelf assignment validation', () => {
   });
 
   it('rejects string fields on Y shelf with explanation', () => {
-    const result = validateShelfAssignment('y', buildField({ type: 'string', name: 'Team' }));
+    const result = validateShelfAssignment(
+      'y',
+      buildField({ type: 'string', semanticType: 'categorical', name: 'Team' })
+    );
     expect(result.valid).toBe(false);
     if (!result.valid) {
       expect(result.reason).toContain('Y Axis');
@@ -26,15 +30,21 @@ describe('shelf assignment validation', () => {
   });
 
   it('supports temporal fields on X shelf', () => {
-    const result = validateShelfAssignment('x', buildField({ type: 'datetime', name: 'Timestamp' }));
+    const result = validateShelfAssignment(
+      'x',
+      buildField({ type: 'datetime', semanticType: 'temporal', name: 'Timestamp' })
+    );
     expect(result).toEqual({ valid: true });
   });
 
   it('rejects unsupported types gracefully', () => {
-    const result = validateShelfAssignment('shape', buildField({ type: 'object', name: 'Payload' }));
+    const result = validateShelfAssignment(
+      'shape',
+      buildField({ type: 'number', semanticType: 'continuous', name: 'Payload' })
+    );
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.reason).toContain('not a supported type');
+      expect(result.reason).toContain('categorical only');
     }
   });
 });

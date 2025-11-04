@@ -95,7 +95,8 @@ const areFieldMapsEqual = (
       leftMeta.fieldId === rightMeta.fieldId &&
       leftMeta.name === rightMeta.name &&
       leftMeta.label === rightMeta.label &&
-      leftMeta.unit === rightMeta.unit
+      leftMeta.unit === rightMeta.unit &&
+      leftMeta.semanticType === rightMeta.semanticType
     );
   });
 };
@@ -180,11 +181,12 @@ const applyAction = (state: AppPresentState, action: AppAction): AppPresentState
                 fieldId: incoming.fieldId,
                 name: previous.name,
                 label: previous.label,
-                unit: previous.unit
-              };
-            } else {
-              acc[fieldId] = incoming;
-            }
+              unit: previous.unit,
+              semanticType: previous.semanticType
+          };
+        } else {
+          acc[fieldId] = incoming;
+        }
             return acc;
           }, {})
         : normalizedFields;
@@ -242,7 +244,8 @@ const applyAction = (state: AppPresentState, action: AppAction): AppPresentState
       if (
         nextField.name === field.name &&
         nextField.label === field.label &&
-        nextField.unit === field.unit
+        nextField.unit === field.unit &&
+        nextField.semanticType === field.semanticType
       ) {
         return state;
       }

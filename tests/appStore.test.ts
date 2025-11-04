@@ -102,7 +102,8 @@ describe('appStore history', () => {
             fieldId: 'price',
             name: 'price',
             label: 'Price',
-            unit: ''
+            unit: '',
+            semanticType: 'continuous'
           }
         }
       }

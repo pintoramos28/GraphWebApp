@@ -1,30 +1,33 @@
 import type { ShelfKey } from '@/state/appStore';
 import type { EncodingField } from './encodingTypes';
+import {
+  semanticTypeToShelfCategory,
+  semanticTypeToVegaType,
+  SEMANTIC_TYPE_LABELS,
+  type SemanticType
+} from './semanticTypes';
 
 export type FieldCategory = 'quantitative' | 'temporal' | 'categorical' | 'unsupported';
 
-const NUMERIC_TYPES = new Set(['number', 'int', 'integer', 'float', 'double', 'decimal']);
-const TEMPORAL_TYPES = new Set(['datetime', 'date', 'timestamp']);
-const CATEGORICAL_TYPES = new Set(['string', 'boolean']);
-
-const normalizeType = (type: string): string => type.trim().toLowerCase();
-
-export const getFieldCategory = (type: string): FieldCategory => {
-  if (!type) {
+const categoryFromSemantic = (semanticType: SemanticType | undefined): FieldCategory => {
+  if (!semanticType) {
     return 'unsupported';
   }
-  const normalized = normalizeType(type);
-  if (NUMERIC_TYPES.has(normalized)) {
-    return 'quantitative';
+  const category = semanticTypeToShelfCategory(semanticType);
+  switch (category) {
+    case 'quantitative':
+      return 'quantitative';
+    case 'temporal':
+      return 'temporal';
+    case 'categorical':
+      return 'categorical';
+    default:
+      return 'unsupported';
   }
-  if (TEMPORAL_TYPES.has(normalized)) {
-    return 'temporal';
-  }
-  if (CATEGORICAL_TYPES.has(normalized)) {
-    return 'categorical';
-  }
-  return 'unsupported';
 };
+
+export const getFieldCategory = (field: EncodingField): FieldCategory =>
+  categoryFromSemantic(field.semanticType);
 
 type ShelfDefinition = {
   key: ShelfKey;
@@ -37,19 +40,19 @@ export const SHELF_DEFINITIONS: ShelfDefinition[] = [
   {
     key: 'x',
     label: 'X Axis',
-    helper: 'Quantitative, temporal, or categorical',
+    helper: 'Continuous, temporal, or categorical',
     accepts: ['quantitative', 'temporal', 'categorical']
   },
   {
     key: 'y',
     label: 'Y Axis',
-    helper: 'Quantitative or temporal',
+    helper: 'Continuous or temporal',
     accepts: ['quantitative', 'temporal']
   },
-  { key: 'color', label: 'Color', helper: 'Categorical or quantitative', accepts: ['categorical', 'quantitative'] },
-  { key: 'size', label: 'Size', helper: 'Quantitative only', accepts: ['quantitative'] },
+  { key: 'color', label: 'Color', helper: 'Categorical or continuous', accepts: ['categorical', 'quantitative'] },
+  { key: 'size', label: 'Size', helper: 'Continuous only', accepts: ['quantitative'] },
   { key: 'shape', label: 'Shape', helper: 'Categorical only', accepts: ['categorical'] },
-  { key: 'opacity', label: 'Opacity', helper: 'Quantitative only', accepts: ['quantitative'] },
+  { key: 'opacity', label: 'Opacity', helper: 'Continuous only', accepts: ['quantitative'] },
   { key: 'row', label: 'Row Facet', helper: 'Categorical or temporal', accepts: ['categorical', 'temporal'] },
   { key: 'column', label: 'Column Facet', helper: 'Categorical or temporal', accepts: ['categorical', 'temporal'] }
 ];
@@ -76,7 +79,7 @@ export const validateShelfAssignment = (
       reason: 'Unknown shelf.'
     };
   }
-  const category = getFieldCategory(field.type);
+  const category = getFieldCategory(field);
   if (category === 'unsupported') {
     return {
       valid: false,
@@ -84,17 +87,10 @@ export const validateShelfAssignment = (
     };
   }
   if (!definition.accepts.includes(category)) {
-    const readableType =
-      category === 'quantitative'
-        ? 'numeric'
-        : category === 'temporal'
-          ? 'date/time'
-          : category === 'categorical'
-            ? 'categorical'
-            : 'this';
+    const readableType = SEMANTIC_TYPE_LABELS[field.semanticType ?? 'categorical'] ?? 'this';
     return {
       valid: false,
-      reason: `${definition.label} expects ${definition.helper.toLowerCase()}, but "${field.name}" is ${readableType}.`
+      reason: `${definition.label} expects ${definition.helper.toLowerCase()}, but "${field.name}" is ${readableType.toLowerCase()}.`
     };
   }
   return { valid: true };
@@ -105,14 +101,5 @@ export const formatFieldTitle = (field: EncodingField): string => {
   return field.unit?.length ? `${base} (${field.unit})` : base;
 };
 
-export const mapToVegaType = (field: EncodingField): 'quantitative' | 'nominal' | 'temporal' => {
-  const category = getFieldCategory(field.type);
-  switch (category) {
-    case 'quantitative':
-      return 'quantitative';
-    case 'temporal':
-      return 'temporal';
-    default:
-      return 'nominal';
-  }
-};
+export const mapToVegaType = (field: EncodingField): 'quantitative' | 'nominal' | 'temporal' =>
+  field.semanticType ? semanticTypeToVegaType(field.semanticType) : 'nominal';
