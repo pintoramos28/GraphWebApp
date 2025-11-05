@@ -13,6 +13,15 @@ export type ShelfKey =
 
 export type ShelfAssignments = Partial<Record<ShelfKey, string>>;
 
+export type ScatterErrorBarMode = 'off' | 'fields' | 'ci' | 'stderr' | 'stdev';
+
+export type ScatterErrorBarsState = {
+  mode: ScatterErrorBarMode;
+  axis: 'x' | 'y';
+  lowerFieldId: string | null;
+  upperFieldId: string | null;
+};
+
 export type DatasetReference = {
   id: string;
   name: string;
@@ -35,6 +44,12 @@ export type AppPresentState = {
       magnitude: number;
       seed: number;
     };
+    trendline: {
+      type: 'none' | 'linear' | 'polynomial' | 'loess';
+      polynomialOrder: number;
+      bandwidth: number;
+    };
+    errorBars: ScatterErrorBarsState;
   };
 };
 
@@ -56,6 +71,18 @@ export type AppAction =
       enabled?: boolean;
       magnitude?: number;
       seed?: number;
+    }
+  | {
+      type: 'scatter/setTrendline';
+      trendline: Partial<{
+        type: 'none' | 'linear' | 'polynomial' | 'loess';
+        polynomialOrder: number;
+        bandwidth: number;
+      }>;
+    }
+  | {
+      type: 'scatter/setErrorBars';
+      errorBars: Partial<ScatterErrorBarsState>;
     };
 
 const HISTORY_LIMIT = 100;
@@ -87,6 +114,17 @@ const createInitialPresentState = (): AppPresentState => ({
       enabled: false,
       magnitude: 0.4,
       seed: 1337
+    },
+    trendline: {
+      type: 'none',
+      polynomialOrder: 2,
+      bandwidth: 0.5
+    },
+    errorBars: {
+      mode: 'off',
+      axis: 'y',
+      lowerFieldId: null,
+      upperFieldId: null
     }
   }
 });
@@ -201,12 +239,12 @@ const applyAction = (state: AppPresentState, action: AppAction): AppPresentState
                 fieldId: incoming.fieldId,
                 name: previous.name,
                 label: previous.label,
-              unit: previous.unit,
-              semanticType: previous.semanticType
-          };
-        } else {
-          acc[fieldId] = incoming;
-        }
+                unit: previous.unit,
+                semanticType: previous.semanticType
+              };
+            } else {
+              acc[fieldId] = incoming;
+            }
             return acc;
           }, {})
         : normalizedFields;
@@ -309,6 +347,58 @@ const applyAction = (state: AppPresentState, action: AppAction): AppPresentState
         }
       };
     }
+    case 'scatter/setTrendline': {
+      const current = state.scatter.trendline;
+      const next = {
+        type: action.trendline.type ?? current.type,
+        polynomialOrder: action.trendline.polynomialOrder ?? current.polynomialOrder,
+        bandwidth: action.trendline.bandwidth ?? current.bandwidth
+      };
+      if (
+        next.type === current.type &&
+        next.polynomialOrder === current.polynomialOrder &&
+        next.bandwidth === current.bandwidth
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        version: state.version + 1,
+        lastUpdated: Date.now(),
+        scatter: {
+          ...state.scatter,
+          trendline: next
+        }
+      };
+    }
+    case 'scatter/setErrorBars': {
+      const current = state.scatter.errorBars;
+      const next: ScatterErrorBarsState = {
+        mode: action.errorBars.mode ?? current.mode,
+        axis: action.errorBars.axis ?? current.axis,
+        lowerFieldId:
+          action.errorBars.lowerFieldId !== undefined ? action.errorBars.lowerFieldId : current.lowerFieldId,
+        upperFieldId:
+          action.errorBars.upperFieldId !== undefined ? action.errorBars.upperFieldId : current.upperFieldId
+      };
+      if (
+        next.mode === current.mode &&
+        next.axis === current.axis &&
+        next.lowerFieldId === current.lowerFieldId &&
+        next.upperFieldId === current.upperFieldId
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        version: state.version + 1,
+        lastUpdated: Date.now(),
+        scatter: {
+          ...state.scatter,
+          errorBars: next
+        }
+      };
+    }
     default: {
       const exhaustiveCheck: never = action;
       throw new Error('Unhandled action in appStore reducer');
@@ -391,3 +481,5 @@ export const selectCanRedo = (store: AppStoreState) => store.canRedo;
 export const selectProjectMeta = (store: AppStoreState) => store.present.project;
 export const selectShelves = (store: AppStoreState) => store.present.shelves;
 export const selectScatterJitter = (store: AppStoreState) => store.present.scatter.jitter;
+export const selectScatterTrendline = (store: AppStoreState) => store.present.scatter.trendline;
+export const selectScatterErrorBars = (store: AppStoreState) => store.present.scatter.errorBars;

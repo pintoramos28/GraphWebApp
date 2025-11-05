@@ -43,8 +43,8 @@ Each task has a checkbox (`[ ]`) and **Refs** linking to the plan item(s) in `do
 22. [ ] Scatter (base): render marks, handle nulls, axes. **Refs:** P22; R10  
 23. [x] Scatter customization: color/size/shape mappings + legends. **Refs:** P22, P25; R11, R19  
 24. [x] Scatter jitter control with reproducible seed. **Refs:** P22; R11  
-25. [ ] Scatter trendlines (linear, polynomial, LOESS) via Vega transforms + equation/R² annotation. **Refs:** P22, P27; R11, R21  
-26. [ ] Scatter error bars from fields or computed stats. **Refs:** P22; R11, R16  
+25. [x] Scatter trendlines (linear, polynomial, LOESS) via Vega transforms + equation/R² annotation. **Refs:** P22, P27; R11, R21  
+26. [x] Scatter error bars from fields or computed stats. **Refs:** P22; R11, R16  
 27. [ ] Scatter faceting and layering by category. **Refs:** P22, P26; R12, R20  
 28. [ ] Line (base): series grouping, X sorting, gap/interpolate options. **Refs:** P23; R13, R14  
 29. [ ] Line markers + interpolation modes (linear/step/monotone). **Refs:** P23; R14  

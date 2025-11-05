@@ -140,4 +140,63 @@ describe('appStore history', () => {
     expect(state.present.scatter.jitter.seed).toBe(2025);
     expect(state.past).toHaveLength(1);
   });
+
+  it('updates scatter trendline configuration', () => {
+    resetStore();
+    const initial = useAppStore.getState().present.scatter.trendline;
+
+    useAppStore.getState().dispatch({
+      type: 'scatter/setTrendline',
+      trendline: {
+        type: 'polynomial',
+        polynomialOrder: 3,
+        bandwidth: 0.4
+      }
+    });
+
+    const state = useAppStore.getState();
+    expect(state.present.scatter.trendline.type).toBe('polynomial');
+    expect(state.present.scatter.trendline.polynomialOrder).toBe(3);
+    expect(state.present.scatter.trendline.bandwidth).toBeCloseTo(0.4);
+    expect(state.past).toHaveLength(1);
+
+    const nextVersion = state.present.version;
+    useAppStore.getState().dispatch({
+      type: 'scatter/setTrendline',
+      trendline: {}
+    });
+    expect(useAppStore.getState().present.version).toBe(nextVersion);
+  });
+
+  it('updates scatter error bar configuration with history tracking', () => {
+    resetStore();
+    const initial = useAppStore.getState().present.scatter.errorBars;
+    expect(initial.mode).toBe('off');
+
+    useAppStore.getState().dispatch({
+      type: 'scatter/setErrorBars',
+      errorBars: {
+        mode: 'fields',
+        lowerFieldId: 'lower',
+        upperFieldId: 'upper'
+      }
+    });
+
+    const state = useAppStore.getState();
+    expect(state.present.scatter.errorBars.mode).toBe('fields');
+    expect(state.present.scatter.errorBars.lowerFieldId).toBe('lower');
+    expect(state.present.scatter.errorBars.upperFieldId).toBe('upper');
+    expect(state.past).toHaveLength(1);
+
+    useAppStore.getState().dispatch({
+      type: 'scatter/setErrorBars',
+      errorBars: {
+        mode: 'fields',
+        lowerFieldId: 'lower',
+        upperFieldId: 'upper'
+      }
+    });
+
+    expect(useAppStore.getState().past).toHaveLength(1);
+  });
 });
